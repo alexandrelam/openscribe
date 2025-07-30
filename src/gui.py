@@ -124,11 +124,8 @@ class SpeechToTextGUI:
         self.record_button.config(text="🎤 Start Recording", state="normal", style="TButton")
         
         if text:
-            if self.text_inserter.insert_text(text):
-                self.status_label.config(text=f"✅ Inserted: {text[:30]}...")
-            else:
-                self.text_inserter.copy_to_clipboard(text)
-                self.status_label.config(text=f"📋 Copied to clipboard: {text[:30]}...")
+            self.text_inserter.copy_to_clipboard(text)
+            self.status_label.config(text=f"📋 Copied to clipboard: {text[:30]}...")
         else:
             self.status_label.config(text="❌ No speech detected")
             messagebox.showwarning("No Speech", "No speech was detected or transcription failed.")

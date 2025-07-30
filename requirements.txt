@@ -3,3 +3,4 @@ pyautogui
 pynput
 faster-whisper
 soundfile
+pyperclip
