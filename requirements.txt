@@ -1,0 +1,5 @@
+sounddevice
+pyautogui
+pynput
+SpeechRecognition
+PyAudio
