@@ -1,5 +1,5 @@
 sounddevice
 pyautogui
 pynput
-SpeechRecognition
-PyAudio
+faster-whisper
+soundfile
