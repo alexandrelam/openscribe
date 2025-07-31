@@ -9,6 +9,8 @@ class Config:
     timeout: int = 5
     microphone_device: Optional[int] = None
     always_on_top: bool = True
+    enable_auto_insert: bool = True
+    auto_insert_timeout: int = 10
     
     @classmethod
     def load(cls) -> 'Config':

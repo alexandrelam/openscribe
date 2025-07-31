@@ -124,13 +124,39 @@ class SpeechToTextGUI:
         self.record_button.config(text="🎤 Start Recording", state="normal", style="TButton")
         
         if text:
+            # Always copy to clipboard first
             self.text_inserter.copy_to_clipboard(text)
-            self.status_label.config(text=f"📋 Copied to clipboard: {text[:30]}...")
+            
+            # Start auto-insert mode if enabled
+            if self.config.enable_auto_insert:
+                success = self.text_inserter.start_auto_insert_mode(
+                    text, 
+                    self.config.auto_insert_timeout,
+                    self._on_auto_insert_complete
+                )
+                if success:
+                    self.status_label.config(text=f"📋 Copied to clipboard • 🖱️ Click in input to insert: {text[:20]}...")
+                else:
+                    self.status_label.config(text=f"📋 Copied to clipboard: {text[:30]}...")
+            else:
+                self.status_label.config(text=f"📋 Copied to clipboard: {text[:30]}...")
         else:
             self.status_label.config(text="❌ No speech detected")
             messagebox.showwarning("No Speech", "No speech was detected or transcription failed.")
         
-        self.root.after(3000, lambda: self.status_label.config(text="Ready"))
+        # Only reset to "Ready" if auto-insert is not active
+        if not self.text_inserter.is_auto_insert_active():
+            self.root.after(3000, lambda: self.status_label.config(text="Ready"))
+    
+    def _on_auto_insert_complete(self, success: bool):
+        """Callback when auto-insert mode completes"""
+        if success:
+            self.status_label.config(text="✅ Text inserted!")
+        else:
+            self.status_label.config(text="⏰ Auto-insert timed out")
+        
+        # Reset to "Ready" after a delay
+        self.root.after(2000, lambda: self.status_label.config(text="Ready"))
     
     def handle_error(self, error_msg: str):
         self.processing = False

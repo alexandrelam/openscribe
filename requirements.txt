@@ -4,3 +4,4 @@ pynput
 faster-whisper
 soundfile
 pyperclip
+ Relloz;
