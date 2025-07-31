@@ -6,12 +6,19 @@ from typing import Optional, Callable
 class TextInserter:
     def __init__(self):
         pyautogui.FAILSAFE = True
-        pyautogui.PAUSE = 0.1
+        pyautogui.PAUSE = 0.01  # Faster for live typing
         self.pending_text: Optional[str] = None
         self.auto_insert_active = False
         self.mouse_listener = None
         self.timeout_timer: Optional[threading.Timer] = None
         self.on_auto_insert_complete: Optional[Callable[[bool], None]] = None
+        
+        # Live typing mode
+        self.live_typing_active = False
+        self.typing_queue = []
+        self.typing_lock = threading.Lock()
+        self.typing_thread: Optional[threading.Thread] = None
+        self.typing_stop_event = threading.Event()
     
     def insert_text(self, text: str) -> bool:
         try:
@@ -113,3 +120,76 @@ class TextInserter:
     def is_auto_insert_active(self) -> bool:
         """Check if auto-insert mode is currently active"""
         return self.auto_insert_active
+    
+    def start_live_typing_mode(self):
+        """Start live typing mode for real-time text insertion"""
+        if self.live_typing_active:
+            return
+        
+        self.live_typing_active = True
+        self.typing_stop_event.clear()
+        self.typing_queue = []
+        
+        # Start the typing thread
+        self.typing_thread = threading.Thread(target=self._live_typing_processor, daemon=True)
+        self.typing_thread.start()
+    
+    def stop_live_typing_mode(self):
+        """Stop live typing mode"""
+        if not self.live_typing_active:
+            return
+        
+        self.live_typing_active = False
+        self.typing_stop_event.set()
+        
+        if self.typing_thread and self.typing_thread.is_alive():
+            self.typing_thread.join(timeout=2.0)
+        
+        with self.typing_lock:
+            self.typing_queue.clear()
+    
+    def queue_text_for_live_typing(self, text: str):
+        """Queue text for immediate live typing at cursor position"""
+        text = text.strip()
+        if not self.live_typing_active or not text:
+            return
+        
+        with self.typing_lock:
+            # Add space before text if queue is not empty and text doesn't start with punctuation
+            if self.typing_queue and not text.startswith((' ', '.', ',', '!', '?', ';', ':')):
+                text = ' ' + text
+            self.typing_queue.append(text)
+    
+    def _live_typing_processor(self):
+        """Process queued text for live typing"""
+        while not self.typing_stop_event.is_set():
+            try:
+                text_to_type = None
+                
+                with self.typing_lock:
+                    if self.typing_queue:
+                        text_to_type = self.typing_queue.pop(0)
+                
+                if text_to_type:
+                    self._type_text_immediately(text_to_type)
+                else:
+                    # Small sleep to prevent excessive CPU usage
+                    time.sleep(0.05)
+                    
+            except Exception as e:
+                print(f"Error in live typing processor: {e}")
+                time.sleep(0.1)
+    
+    def _type_text_immediately(self, text: str) -> bool:
+        """Type text immediately at current cursor position"""
+        try:
+            # No delay - type immediately for live experience
+            pyautogui.typewrite(text, interval=0.02)  # Fast typing speed
+            return True
+        except Exception as e:
+            print(f"Failed to type text immediately: {e}")
+            return False
+    
+    def is_live_typing_active(self) -> bool:
+        """Check if live typing mode is currently active"""
+        return self.live_typing_active

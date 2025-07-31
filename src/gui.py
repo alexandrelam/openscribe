@@ -147,6 +147,7 @@ class SpeechToTextGUI:
         
         self.recording = False
         self.processing = False
+        self.live_mode_active = False
         
         self.setup_ui()
         self.setup_hotkeys()
@@ -158,13 +159,23 @@ class SpeechToTextGUI:
         self.status_label = ttk.Label(main_frame, text="Ready", font=("Arial", 12))
         self.status_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
         
+        # Regular recording button
         self.record_button = ttk.Button(
             main_frame, 
             text="🎤 Start Recording", 
             command=self.toggle_recording,
-            width=20
+            width=18
         )
-        self.record_button.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+        self.record_button.grid(row=1, column=0, pady=(0, 10), padx=(0, 5))
+        
+        # Live mode button
+        self.live_button = ttk.Button(
+            main_frame,
+            text="🔴 Live Mode",
+            command=self.toggle_live_mode,
+            width=18
+        )
+        self.live_button.grid(row=1, column=1, pady=(0, 10), padx=(5, 0))
         
         self.progress = ttk.Progressbar(main_frame, mode='indeterminate')
         self.progress.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -205,13 +216,22 @@ class SpeechToTextGUI:
             print(f"Failed to setup hotkeys: {e}")
     
     def toggle_recording(self):
-        if self.processing:
+        if self.processing or self.live_mode_active:
             return
             
         if not self.recording:
             self.start_recording()
         else:
             self.stop_recording()
+    
+    def toggle_live_mode(self):
+        if self.processing or self.recording:
+            return
+        
+        if not self.live_mode_active:
+            self.start_live_mode()
+        else:
+            self.stop_live_mode()
     
     def start_recording(self):
         if self.audio_recorder.start_recording():
@@ -310,9 +330,69 @@ class SpeechToTextGUI:
         else:
             messagebox.showinfo("Settings", "Settings saved successfully!")
     
+    def start_live_mode(self):
+        """Start live transcription mode with real-time typing"""
+        try:
+            # Start transcription engine streaming
+            self.transcription_engine.start_streaming_transcription(self.handle_streaming_text)
+            
+            # Start live typing mode
+            self.text_inserter.start_live_typing_mode()
+            
+            # Start streaming audio recording
+            success = self.audio_recorder.start_streaming_recording(self.transcription_engine.process_audio_chunk)
+            
+            if success:
+                self.live_mode_active = True
+                self.live_button.config(text="⏹️ Stop Live", style="Accent.TButton")
+                self.record_button.config(state="disabled")
+                self.status_label.config(text="🔴 Live Mode: Speak and text will appear at cursor!")
+                self.progress.start()
+            else:
+                # Cleanup on failure
+                self.transcription_engine.stop_streaming_transcription()
+                self.text_inserter.stop_live_typing_mode()
+                messagebox.showerror("Error", "Failed to start live mode. Check microphone permissions.")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to start live mode: {e}")
+    
+    def stop_live_mode(self):
+        """Stop live transcription mode"""
+        if not self.live_mode_active:
+            return
+        
+        try:
+            # Stop all streaming processes
+            self.audio_recorder.stop_streaming_recording()
+            self.transcription_engine.stop_streaming_transcription()
+            self.text_inserter.stop_live_typing_mode()
+            
+            self.live_mode_active = False
+            self.live_button.config(text="🔴 Live Mode", style="TButton")
+            self.record_button.config(state="normal")
+            self.status_label.config(text="Ready")
+            self.progress.stop()
+            
+        except Exception as e:
+            print(f"Error stopping live mode: {e}")
+    
+    def handle_streaming_text(self, text: str):
+        """Handle real-time transcribed text from streaming engine"""
+        if text and self.live_mode_active:
+            # Queue text for live typing
+            self.text_inserter.queue_text_for_live_typing(text)
+            
+            # Update status to show what's being transcribed
+            self.root.after(0, lambda: self.status_label.config(
+                text=f"🔴 Live: {text[:30]}..." if len(text) > 30 else f"🔴 Live: {text}"
+            ))
+    
     def quit_app(self):
         if self.recording:
             self.audio_recorder.stop_recording()
+        if self.live_mode_active:
+            self.stop_live_mode()
         self.root.quit()
     
     def run(self):
