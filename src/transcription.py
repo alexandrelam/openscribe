@@ -8,11 +8,25 @@ import threading
 import queue
 
 class TranscriptionEngine:
-    def __init__(self):
-        # Initialize Whisper model with English small version for optimal performance
-        print("🔄 Loading Whisper model...")
-        self.model = WhisperModel("small.en", device="cpu", compute_type="int8")
-        print("✅ Whisper model loaded successfully")
+    def __init__(self, language_config: str = "auto", model_size: str = "small"):
+        """
+        Initialize Whisper model with configurable language support
+        
+        Args:
+            language_config: "auto" for automatic detection, "en"/"fr"/etc for specific language
+            model_size: "small", "base", "large-v3" etc.
+        """
+        self.language_config = language_config
+        self.model_size = model_size
+        self.current_model_name = None
+        
+        # Load appropriate model based on language configuration
+        self._load_model()
+        
+        # Language detection settings
+        self.detected_language = None
+        self.language_confidence = 0.0
+        self.language_detection_enabled = language_config == "auto"
         
         # Streaming transcription state
         self.streaming_active = False
@@ -26,6 +40,45 @@ class TranscriptionEngine:
         self.buffer_lock = threading.Lock()
         self.pending_chunks = []  # Queue for serialized processing
         self.processing_lock = threading.Lock()  # Ensure one chunk at a time
+    
+    def _load_model(self):
+        """Load appropriate Whisper model based on language configuration"""
+        # Determine model name based on language config
+        if self.language_config == "en":
+            # Use English-only model for optimal performance
+            model_name = f"{self.model_size}.en"
+        else:
+            # Use multilingual model for other languages or auto-detection
+            model_name = self.model_size
+        
+        # Only reload if model has changed
+        if model_name != self.current_model_name:
+            print(f"🔄 Loading Whisper model: {model_name}")
+            self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
+            self.current_model_name = model_name
+            print(f"✅ Whisper model loaded: {model_name}")
+    
+    def configure_language(self, language_config: str = "auto", model_size: str = "small"):
+        """Configure language settings and reload model if necessary"""
+        old_language_config = self.language_config
+        self.language_config = language_config
+        self.model_size = model_size
+        self.language_detection_enabled = language_config == "auto"
+        
+        # Reload model if language configuration changed
+        if old_language_config != language_config:
+            self._load_model()
+            print(f"🌍 Language configuration updated: {language_config}")
+    
+    def get_language_info(self) -> dict:
+        """Get current language detection information"""
+        return {
+            'configured_language': self.language_config,
+            'detected_language': self.detected_language,
+            'language_confidence': self.language_confidence,
+            'detection_enabled': self.language_detection_enabled,
+            'current_model': self.current_model_name
+        }
         
     def transcribe_audio(self, audio_data: np.ndarray, sample_rate: int = 16000) -> Optional[str]:
         try:
@@ -34,10 +87,28 @@ class TranscriptionEngine:
                 temp_filename = temp_file.name
             
             try:
-                # Transcribe using faster-whisper
-                segments, info = self.model.transcribe(temp_filename, beam_size=5)
+                # Prepare transcription parameters
+                transcribe_params = {
+                    'beam_size': 5,
+                    'condition_on_previous_text': False
+                }
                 
-                print(f"🌍 Detected language: {info.language} (probability: {info.language_probability:.2f})")
+                # Add language parameter if not auto-detecting
+                if self.language_config != "auto":
+                    transcribe_params['language'] = self.language_config
+                
+                # Transcribe using faster-whisper
+                segments, info = self.model.transcribe(temp_filename, **transcribe_params)
+                
+                # Update language detection info
+                self.detected_language = info.language
+                self.language_confidence = info.language_probability
+                
+                # Log language information
+                if self.language_detection_enabled:
+                    print(f"🌍 Auto-detected language: {info.language} (confidence: {info.language_probability:.2f})")
+                else:
+                    print(f"🌍 Using configured language: {self.language_config}")
                 
                 # Combine all segments into a single text
                 transcribed_text = ""
@@ -49,7 +120,7 @@ class TranscriptionEngine:
                 transcribed_text = transcribed_text.strip()
                 
                 if transcribed_text:
-                    print(f"🎯 Speech detected ({segment_count} segments): '{transcribed_text}'")
+                    print(f"🎯 Speech transcribed ({segment_count} segments): '{transcribed_text}'")
                     return transcribed_text
                 else:
                     print("⚠️ No speech detected in audio")
@@ -138,13 +209,24 @@ class TranscriptionEngine:
                 temp_filename = temp_file.name
             
             try:
+                # Prepare fast transcription parameters
+                transcribe_params = {
+                    'beam_size': 1,  # Faster but potentially less accurate
+                    'best_of': 1,    # Single pass for speed
+                    'temperature': 0.0,  # Deterministic output
+                    'condition_on_previous_text': False
+                }
+                
+                # Add language parameter if not auto-detecting
+                if self.language_config != "auto":
+                    transcribe_params['language'] = self.language_config
+                
                 # Use faster settings for real-time transcription
-                segments, info = self.model.transcribe(
-                    temp_filename, 
-                    beam_size=1,  # Faster but potentially less accurate
-                    best_of=1,    # Single pass for speed
-                    temperature=0.0  # Deterministic output
-                )
+                segments, info = self.model.transcribe(temp_filename, **transcribe_params)
+                
+                # Update language detection info (for streaming mode)
+                self.detected_language = info.language
+                self.language_confidence = info.language_probability
                 
                 # Combine segments into text
                 transcribed_text = ""
