@@ -191,6 +191,9 @@ class SpeechToTextGUI:
         # Apply VAD configuration on startup
         self._apply_vad_config()
         
+        # Apply text insertion configuration on startup
+        self._apply_paste_config()
+        
         self.recording = False
         self.processing = False
         self.live_mode_active = False
@@ -371,12 +374,14 @@ class SpeechToTextGUI:
             if not self.recording:
                 self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
                 self._apply_vad_config()
+                self._apply_paste_config()
                 messagebox.showinfo("Settings", "Microphone device and VAD settings updated successfully!")
             else:
                 messagebox.showwarning("Settings", "Settings saved. Microphone device will be updated after current recording stops.")
         else:
-            # Apply VAD configuration to existing recorder
+            # Apply VAD and paste configuration to existing components
             self._apply_vad_config()
+            self._apply_paste_config()
             messagebox.showinfo("Settings", "Settings saved successfully!")
     
     def _apply_vad_config(self):
@@ -387,6 +392,16 @@ class SpeechToTextGUI:
                 min_chunk_duration=self.config.vad_min_chunk_duration,
                 max_chunk_duration=self.config.vad_max_chunk_duration,
                 silence_timeout=self.config.vad_silence_timeout
+            )
+    
+    def _apply_paste_config(self):
+        """Apply paste configuration to the text inserter"""
+        if self.text_inserter:
+            self.text_inserter.configure_pasting(
+                paste_method=self.config.paste_method,
+                paste_delay=self.config.paste_delay,
+                live_paste_interval=self.config.live_paste_interval,
+                restore_clipboard=self.config.restore_clipboard
             )
     
     def start_live_mode(self):

@@ -19,6 +19,12 @@ class Config:
     vad_max_chunk_duration: float = 10.0  # maximum seconds per chunk
     vad_silence_timeout: float = 0.5  # seconds of silence before processing chunk
     
+    # Text insertion configuration
+    paste_method: str = "applescript"  # "applescript" or "keyboard"
+    paste_delay: float = 0.05  # seconds to wait after copying to clipboard
+    live_paste_interval: float = 0.3  # seconds between live paste operations
+    restore_clipboard: bool = True  # whether to restore original clipboard content
+    
     CONFIG_FILE = "config.json"
     
     @classmethod
