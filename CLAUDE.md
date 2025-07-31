@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run CLI**: `python main_cli.py` 
 - **Install deps**: `pip install -r requirements.txt`
 - **Virtual env**: `source venv/bin/activate`
+- **Format code**: `black *.py src/*.py`
 - **Config**: Automatically saved to `config.json`
 - **Permissions**: Requires microphone and accessibility permissions on macOS
 

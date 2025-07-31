@@ -6,3 +6,4 @@ soundfile
 pyperclip
 webrtcvad
 numpy
+black
