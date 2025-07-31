@@ -6,6 +6,7 @@ from .audio_recorder import AudioRecorder
 from .transcription import TranscriptionEngine
 from .text_inserter import TextInserter
 from .config import Config
+from .recording_indicator import RecordingIndicator, IndicatorState
 
 
 class SettingsDialog:
@@ -17,7 +18,7 @@ class SettingsDialog:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Settings")
-        self.window.geometry("450x550")
+        self.window.geometry("450x700")
         self.window.resizable(False, False)
         self.window.transient(parent)
         self.window.grab_set()
@@ -25,8 +26,8 @@ class SettingsDialog:
         # Center the window
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() // 2) - (450 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (550 // 2)
-        self.window.geometry(f"450x550+{x}+{y}")
+        y = (self.window.winfo_screenheight() // 2) - (700 // 2)
+        self.window.geometry(f"450x700+{x}+{y}")
         
         self.setup_ui()
         
@@ -154,9 +155,51 @@ class SettingsDialog:
         silence_timeout_spinbox = ttk.Spinbox(main_frame, from_=0.1, to=2.0, increment=0.1, textvariable=self.vad_silence_timeout_var, width=10)
         silence_timeout_spinbox.grid(row=13, column=1, sticky=tk.W, pady=(0, 20))
         
+        # Recording Indicator settings
+        ttk.Label(main_frame, text="Recording Indicator:", font=("Arial", 12, "bold")).grid(
+            row=14, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        self.show_indicator_var = tk.BooleanVar(value=self.config.show_recording_indicator)
+        ttk.Checkbutton(main_frame, text="Show fixed position recording indicator", 
+                       variable=self.show_indicator_var).grid(
+            row=15, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        ttk.Label(main_frame, text="Screen position (X, Y):").grid(
+            row=16, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        position_frame = ttk.Frame(main_frame)
+        position_frame.grid(row=16, column=1, sticky=tk.W, pady=(0, 5))
+        
+        self.indicator_position_x_var = tk.StringVar(value=str(self.config.indicator_position_x))
+        position_x_spinbox = ttk.Spinbox(position_frame, from_=0, to=1000, textvariable=self.indicator_position_x_var, width=8)
+        position_x_spinbox.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.indicator_position_y_var = tk.StringVar(value=str(self.config.indicator_position_y))
+        position_y_spinbox = ttk.Spinbox(position_frame, from_=0, to=1000, textvariable=self.indicator_position_y_var, width=8)
+        position_y_spinbox.pack(side=tk.LEFT)
+        
+        ttk.Label(main_frame, text="Size (pixels):").grid(
+            row=17, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.indicator_size_var = tk.StringVar(value=str(self.config.indicator_size))
+        size_spinbox = ttk.Spinbox(main_frame, from_=10, to=50, textvariable=self.indicator_size_var, width=10)
+        size_spinbox.grid(row=17, column=1, sticky=tk.W, pady=(0, 5))
+        
+        ttk.Label(main_frame, text="Opacity (0.1-1.0):").grid(
+            row=18, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.indicator_opacity_var = tk.StringVar(value=str(self.config.indicator_opacity))
+        opacity_spinbox = ttk.Spinbox(main_frame, from_=0.1, to=1.0, increment=0.1, textvariable=self.indicator_opacity_var, width=10)
+        opacity_spinbox.grid(row=18, column=1, sticky=tk.W, pady=(0, 20))
+        
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=14, column=0, columnspan=2, pady=(20, 0))
+        button_frame.grid(row=19, column=0, columnspan=2, pady=(20, 0))
         
         ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(10, 0))
         ttk.Button(button_frame, text="Save", command=self.save).pack(side=tk.RIGHT)
@@ -226,6 +269,13 @@ class SettingsDialog:
             self.config.vad_max_chunk_duration = float(self.vad_max_duration_var.get())
             self.config.vad_silence_timeout = float(self.vad_silence_timeout_var.get())
             
+            # Update indicator config
+            self.config.show_recording_indicator = self.show_indicator_var.get()
+            self.config.indicator_position_x = int(self.indicator_position_x_var.get())
+            self.config.indicator_position_y = int(self.indicator_position_y_var.get())
+            self.config.indicator_size = int(self.indicator_size_var.get())
+            self.config.indicator_opacity = float(self.indicator_opacity_var.get())
+            
             # Save config
             self.config.save()
             
@@ -257,6 +307,14 @@ class SpeechToTextGUI:
         )
         self.text_inserter = TextInserter()
         
+        # Initialize recording indicator
+        self.recording_indicator = RecordingIndicator(
+            position_x=self.config.indicator_position_x,
+            position_y=self.config.indicator_position_y,
+            size=self.config.indicator_size,
+            opacity=self.config.indicator_opacity
+        )
+        
         # Apply configurations on startup
         self._apply_vad_config()
         self._apply_paste_config()
@@ -268,6 +326,10 @@ class SpeechToTextGUI:
         
         self.setup_ui()
         self.setup_hotkeys()
+        
+        # Start recording indicator if enabled
+        if self.config.show_recording_indicator:
+            self.recording_indicator.start(self.root)
     
     def setup_ui(self):
         main_frame = ttk.Frame(self.root, padding="20")
@@ -363,6 +425,10 @@ class SpeechToTextGUI:
             self.record_button.config(text="⏹️ Stop Recording", style="Accent.TButton")
             self.status_label.config(text="🔴 Recording... Speak now!")
             self.progress.start()
+            
+            # Update indicator state
+            if self.config.show_recording_indicator:
+                self.recording_indicator.set_state(IndicatorState.RECORDING)
         else:
             messagebox.showerror("Error", "Failed to start recording. Check microphone permissions.")
     
@@ -374,6 +440,10 @@ class SpeechToTextGUI:
         self.progress.stop()
         self.record_button.config(text="Processing...", state="disabled")
         self.status_label.config(text="Processing audio...")
+        
+        # Update indicator to processing state
+        if self.config.show_recording_indicator:
+            self.recording_indicator.set_state(IndicatorState.PROCESSING)
         
         def process_audio():
             try:
@@ -392,6 +462,10 @@ class SpeechToTextGUI:
     def handle_transcription(self, text: Optional[str]):
         self.processing = False
         self.record_button.config(text="🎤 Start Recording", state="normal", style="TButton")
+        
+        # Hide indicator when processing is complete
+        if self.config.show_recording_indicator:
+            self.recording_indicator.set_state(IndicatorState.HIDDEN)
         
         if text:
             # Always copy to clipboard first
@@ -431,6 +505,11 @@ class SpeechToTextGUI:
     def handle_error(self, error_msg: str):
         self.processing = False
         self.record_button.config(text="🎤 Start Recording", state="normal", style="TButton")
+        
+        # Hide indicator when error occurs
+        if self.config.show_recording_indicator:
+            self.recording_indicator.set_state(IndicatorState.HIDDEN)
+        
         self.status_label.config(text="❌ Error occurred")
         messagebox.showerror("Error", f"An error occurred: {error_msg}")
         self.root.after(3000, lambda: self.status_label.config(text="Ready"))
@@ -455,6 +534,7 @@ class SpeechToTextGUI:
                 self._apply_vad_config()
                 self._apply_paste_config()
                 self._apply_language_config()
+                self._apply_indicator_config()
                 messagebox.showinfo("Settings", "All settings updated successfully!")
             else:
                 messagebox.showwarning("Settings", "Settings saved. Microphone device will be updated after current recording stops.")
@@ -463,6 +543,7 @@ class SpeechToTextGUI:
             self._apply_vad_config()
             self._apply_paste_config()
             self._apply_language_config()
+            self._apply_indicator_config()
             messagebox.showinfo("Settings", "Settings saved successfully!")
     
     def _apply_vad_config(self):
@@ -492,6 +573,25 @@ class SpeechToTextGUI:
                 language_config=self.config.transcription_language,
                 model_size=self.config.model_size
             )
+    
+    def _apply_indicator_config(self):
+        """Apply indicator configuration"""
+        if hasattr(self, 'recording_indicator'):
+            # Update indicator appearance
+            self.recording_indicator.configure_appearance(
+                position_x=self.config.indicator_position_x,
+                position_y=self.config.indicator_position_y,
+                size=self.config.indicator_size,
+                opacity=self.config.indicator_opacity
+            )
+            
+            # Start or stop indicator based on config
+            if self.config.show_recording_indicator:
+                if not self.recording_indicator.is_running:
+                    self.recording_indicator.start(self.root)
+            else:
+                if self.recording_indicator.is_running:
+                    self.recording_indicator.stop()
     
     def _update_language_display(self):
         """Update the language information display"""
@@ -532,6 +632,10 @@ class SpeechToTextGUI:
                 self.record_button.config(state="disabled")
                 self.status_label.config(text="🔴 Live Mode: Speak and text will appear at cursor!")
                 self.progress.start()
+                
+                # Update indicator to live mode state
+                if self.config.show_recording_indicator:
+                    self.recording_indicator.set_state(IndicatorState.LIVE_MODE)
             else:
                 # Cleanup on failure
                 self.transcription_engine.stop_streaming_transcription()
@@ -558,6 +662,10 @@ class SpeechToTextGUI:
             self.status_label.config(text="Ready")
             self.progress.stop()
             
+            # Hide indicator when live mode stops
+            if self.config.show_recording_indicator:
+                self.recording_indicator.set_state(IndicatorState.HIDDEN)
+            
         except Exception as e:
             print(f"Error stopping live mode: {e}")
     
@@ -581,6 +689,11 @@ class SpeechToTextGUI:
             self.audio_recorder.stop_recording()
         if self.live_mode_active:
             self.stop_live_mode()
+        
+        # Stop recording indicator
+        if hasattr(self, 'recording_indicator'):
+            self.recording_indicator.stop()
+        
         self.root.quit()
     
     def run(self):

@@ -32,6 +32,13 @@ class Config:
     live_paste_interval: float = 0.3  # seconds between live paste operations
     restore_clipboard: bool = True  # whether to restore original clipboard content
     
+    # Recording indicator configuration
+    show_recording_indicator: bool = True  # whether to show recording indicator
+    indicator_position_x: int = 20  # horizontal position on screen
+    indicator_position_y: int = 20  # vertical position on screen
+    indicator_size: int = 20  # size of the indicator in pixels
+    indicator_opacity: float = 0.9  # transparency of the indicator (0.0-1.0)
+    
     CONFIG_FILE = "config.json"
     
     @classmethod
