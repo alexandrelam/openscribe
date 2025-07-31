@@ -21,7 +21,7 @@ class SettingsDialog:
 
         self.window = tk.Toplevel(parent)
         self.window.title("Settings")
-        self.window.geometry("450x700")
+        self.window.geometry("450x800")
         self.window.resizable(False, False)
         self.window.transient(parent)
         self.window.grab_set()
@@ -29,8 +29,8 @@ class SettingsDialog:
         # Center the window
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() // 2) - (450 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (700 // 2)
-        self.window.geometry(f"450x700+{x}+{y}")
+        y = (self.window.winfo_screenheight() // 2) - (800 // 2)
+        self.window.geometry(f"450x800+{x}+{y}")
 
         self.setup_ui()
 

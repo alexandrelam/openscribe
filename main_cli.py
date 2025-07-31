@@ -25,8 +25,11 @@ class RecordingState(Enum):
 class SpeechToTextCLI:
     def __init__(self):
         self.config = Config.load()
-        self.audio_recorder = AudioRecorder()
-        self.transcription_engine = TranscriptionEngine()
+        self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
+        self.transcription_engine = TranscriptionEngine(
+            language_config=self.config.transcription_language,
+            model_size=self.config.model_size,
+        )
         self.text_inserter = TextInserter()
         self.double_key_detector = DoubleKeyDetector(double_press_timeout=0.5)
         self.sound_notifications = SoundNotifications(
@@ -41,6 +44,11 @@ class SpeechToTextCLI:
 
         # Set up double key callbacks
         self.double_key_detector.set_callbacks(on_double_shift=self._on_double_shift)
+
+        # Apply configurations on startup
+        self._apply_vad_config()
+        self._apply_paste_config()
+        self._apply_language_config()
 
     def _print_status(self, message: str):
         """Print status message with current state"""
@@ -166,13 +174,96 @@ class SpeechToTextCLI:
         self._set_state(RecordingState.IDLE)
         self._print_status("Ready - Double-press Shift to start recording")
 
+    def _apply_vad_config(self):
+        """Apply VAD configuration to the audio recorder"""
+        if self.audio_recorder:
+            self.audio_recorder.configure_vad(
+                aggressiveness=self.config.vad_aggressiveness,
+                min_chunk_duration=self.config.vad_min_chunk_duration,
+                max_chunk_duration=self.config.vad_max_chunk_duration,
+                silence_timeout=self.config.vad_silence_timeout,
+            )
+
+    def _apply_paste_config(self):
+        """Apply paste configuration to the text inserter"""
+        if self.text_inserter:
+            self.text_inserter.configure_pasting(
+                paste_method=self.config.paste_method,
+                paste_delay=self.config.paste_delay,
+                live_paste_interval=self.config.live_paste_interval,
+                restore_clipboard=self.config.restore_clipboard,
+            )
+
+    def _apply_language_config(self):
+        """Apply language configuration to the transcription engine"""
+        if self.transcription_engine:
+            self.transcription_engine.configure_language(
+                language_config=self.config.transcription_language,
+                model_size=self.config.model_size,
+            )
+
+    def _display_current_settings(self):
+        """Display current configuration settings"""
+        print("\n📋 Current Settings:")
+        print("-" * 30)
+        
+        # Language settings
+        language_name = self._get_language_display_name(self.config.transcription_language)
+        print(f"🌍 Language: {language_name}")
+        
+        # Model size
+        model_name = self._get_model_display_name(self.config.model_size)
+        print(f"🧠 Model: {model_name}")
+        
+        # Microphone device
+        if self.config.microphone_device is None:
+            print("🎤 Microphone: Default (System Default)")
+        else:
+            device_name = self._get_device_name(self.config.microphone_device)
+            print(f"🎤 Microphone: {device_name}")
+        
+        # VAD settings
+        print(f"🔊 VAD Aggressiveness: {self.config.vad_aggressiveness}/3")
+        
+        # Auto-insert setting
+        insert_status = "Enabled" if self.config.enable_auto_insert else "Disabled"
+        print(f"📝 Auto-insert: {insert_status}")
+        
+        print("-" * 30)
+
+    def _get_language_display_name(self, lang_code: str) -> str:
+        """Get display name for language code"""
+        from src.config import Config
+        available_languages = Config.get_available_languages()
+        return available_languages.get(lang_code, lang_code)
+
+    def _get_model_display_name(self, model_code: str) -> str:
+        """Get display name for model code"""
+        from src.config import Config
+        available_models = Config.get_available_models()
+        return available_models.get(model_code, model_code)
+
+    def _get_device_name(self, device_id: int) -> str:
+        """Get device name for device ID"""
+        try:
+            devices = self.audio_recorder.get_available_devices()
+            for device in devices:
+                if device.get("index") == device_id and device["max_input_channels"] > 0:
+                    return f"{device['name']} (Device {device_id})"
+            return f"Device {device_id} (Unknown)"
+        except Exception:
+            return f"Device {device_id}"
+
     def start(self):
         """Start the CLI application"""
         print("🎤 Speech-to-Text MVP (CLI Version)")
         print("=" * 40)
 
+        # Display current settings
+        self._display_current_settings()
+
         # Show available audio devices
-        print("Available audio devices:")
+        print("\n🎧 Available audio devices:")
         devices = self.audio_recorder.get_available_devices()
         for i, device in enumerate(devices):
             if device["max_input_channels"] > 0:
