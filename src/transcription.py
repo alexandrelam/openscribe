@@ -21,10 +21,11 @@ class TranscriptionEngine:
         self.transcription_thread: Optional[threading.Thread] = None
         self.streaming_stop_event = threading.Event()
         
-        # Text deduplication for overlapping chunks
-        self.recent_words = []  # Track recent words to avoid duplication
-        self.words_lock = threading.Lock()
-        self.max_recent_words = 20  # Keep track of last 20 words
+        # Text stream assembly system
+        self.text_buffer = ""  # Continuous assembled text
+        self.buffer_lock = threading.Lock()
+        self.pending_chunks = []  # Queue for serialized processing
+        self.processing_lock = threading.Lock()  # Ensure one chunk at a time
         
     def transcribe_audio(self, audio_data: np.ndarray, sample_rate: int = 16000) -> Optional[str]:
         try:
@@ -63,15 +64,17 @@ class TranscriptionEngine:
             return None
     
     def start_streaming_transcription(self, callback: Callable[[str], None]):
-        """Start streaming transcription mode"""
+        """Start streaming transcription mode with text assembly"""
         self.streaming_active = True
         self.streaming_callback = callback
         self.streaming_stop_event.clear()
         
-        with self.words_lock:
-            self.recent_words.clear()
+        # Initialize text buffer system
+        with self.buffer_lock:
+            self.text_buffer = ""
+            self.pending_chunks = []
         
-        # Start the transcription processing thread
+        # Start the serialized transcription processing thread
         self.transcription_thread = threading.Thread(target=self._streaming_processor, daemon=True)
         self.transcription_thread.start()
     
@@ -85,8 +88,10 @@ class TranscriptionEngine:
         
         self.streaming_callback = None
         
-        with self.words_lock:
-            self.recent_words.clear()
+        # Clear text buffer system
+        with self.buffer_lock:
+            self.text_buffer = ""
+            self.pending_chunks = []
         
         # Clear any remaining items in queue
         while not self.transcription_queue.empty():
@@ -101,21 +106,23 @@ class TranscriptionEngine:
             self.transcription_queue.put(audio_data.copy())
     
     def _streaming_processor(self):
-        """Process queued audio chunks for streaming transcription"""
+        """Serialized processing of audio chunks with text assembly"""
         while not self.streaming_stop_event.is_set():
             try:
                 # Get audio chunk with timeout
                 audio_chunk = self.transcription_queue.get(timeout=0.5)
                 
-                # Transcribe the chunk
-                text = self._transcribe_chunk(audio_chunk)
-                
-                if text:
-                    # Apply deduplication
-                    new_text = self._deduplicate_text(text)
+                # Process chunk with serialization lock (one at a time)
+                with self.processing_lock:
+                    # Transcribe the chunk
+                    new_text = self._transcribe_chunk(audio_chunk)
                     
-                    if new_text and self.streaming_callback:
-                        self.streaming_callback(new_text)
+                    if new_text:
+                        # Assemble with existing text buffer
+                        assembled_text = self._assemble_text_chunk(new_text)
+                        
+                        if assembled_text and self.streaming_callback:
+                            self.streaming_callback(assembled_text)
                 
             except queue.Empty:
                 continue
@@ -155,55 +162,108 @@ class TranscriptionEngine:
             print(f"❌ Chunk transcription error: {e}")
             return None
     
-    def _deduplicate_text(self, text: str) -> str:
-        """Remove duplicate words from overlapping transcription chunks"""
+    def _assemble_text_chunk(self, new_text: str) -> str:
+        """Assemble new text chunk with existing buffer using sequence-based overlap detection"""
+        if not new_text:
+            return ""
+        
+        # Clean and normalize the new text
+        cleaned_new = self._preprocess_text(new_text)
+        if not cleaned_new:
+            return ""
+        
+        with self.buffer_lock:
+            # If buffer is empty, this is the first chunk
+            if not self.text_buffer:
+                self.text_buffer = cleaned_new
+                return cleaned_new
+            
+            # Find overlap between buffer end and new text start
+            overlap_result = self._find_text_overlap(self.text_buffer, cleaned_new)
+            
+            if overlap_result:
+                # Merge texts by removing overlap from new text
+                buffer_end, new_start, overlap_length = overlap_result
+                
+                # Remove overlapping part from new text
+                truly_new_text = cleaned_new[overlap_length:].strip()
+                
+                # Always add space before new text unless buffer ends with punctuation
+                if truly_new_text:
+                    if not self.text_buffer.endswith((' ', '.', ',', '!', '?', ';', ':')):
+                        truly_new_text = ' ' + truly_new_text
+                    elif self.text_buffer.endswith(('.', '!', '?')) and truly_new_text and truly_new_text[0].islower():
+                        # Add space after sentence-ending punctuation
+                        truly_new_text = ' ' + truly_new_text
+                
+                # Update buffer
+                if truly_new_text:
+                    self.text_buffer += truly_new_text
+                    return truly_new_text
+                else:
+                    return ""  # All text was duplicate
+            else:
+                # No overlap found, add with spacing
+                spaced_text = cleaned_new
+                if not self.text_buffer.endswith(' ') and not cleaned_new.startswith(' '):
+                    spaced_text = ' ' + cleaned_new
+                
+                self.text_buffer += spaced_text
+                return spaced_text
+    
+    def _find_text_overlap(self, buffer_text: str, new_text: str):
+        """Find overlapping sequence between buffer end and new text start"""
+        if not buffer_text or not new_text:
+            return None
+        
+        # Convert to words for better matching
+        buffer_words = buffer_text.split()
+        new_words = new_text.split()
+        
+        if not buffer_words or not new_words:
+            return None
+        
+        # Look for longest overlap (check longer overlaps first)
+        max_overlap_len = min(len(buffer_words), len(new_words), 8)  # Limit to 8 words max
+        
+        for overlap_len in range(max_overlap_len, 0, -1):
+            # Get last N words from buffer
+            buffer_end = buffer_words[-overlap_len:]
+            # Get first N words from new text  
+            new_start = new_words[:overlap_len]
+            
+            # Compare word sequences (case-insensitive)
+            buffer_end_lower = [w.lower().strip('.,!?;:') for w in buffer_end]
+            new_start_lower = [w.lower().strip('.,!?;:') for w in new_start]
+            
+            if buffer_end_lower == new_start_lower:
+                # Found overlap - calculate character position
+                overlap_chars = len(' '.join(new_words[:overlap_len]))
+                return (buffer_end, new_start, overlap_chars)
+        
+        return None
+    
+    def _preprocess_text(self, text: str) -> str:
+        """Clean and preprocess text before deduplication"""
         if not text:
             return ""
         
-        # Split into words and normalize
-        words = text.split()
-        if not words:
-            return ""
+        # Remove extra whitespace and normalize
+        cleaned = ' '.join(text.split())
         
-        new_words = []
+        # Remove or fix common transcription artifacts
+        artifacts = [
+            ('  ', ' '),      # Double spaces
+            (' .', '.'),      # Space before period
+            (' ,', ','),      # Space before comma
+            (' !', '!'),      # Space before exclamation
+            (' ?', '?'),      # Space before question mark
+        ]
         
-        with self.words_lock:
-            # Convert recent words to lowercase for comparison
-            recent_lower = [w.lower() for w in self.recent_words]
-            
-            # Find where the new text overlaps with recent words
-            overlap_found = False
-            start_index = 0
-            
-            # Look for the best overlap point
-            for i in range(min(len(words), len(recent_lower))):
-                # Check if the first i+1 words of new text match the last i+1 words of recent
-                new_start = [w.lower() for w in words[:i+1]]
-                recent_end = recent_lower[-(i+1):] if len(recent_lower) >= i+1 else recent_lower
-                
-                if new_start == recent_end:
-                    start_index = i + 1  # Skip the overlapping part
-                    overlap_found = True
-            
-            # If no clear overlap found but we have recent words, be conservative
-            if not overlap_found and recent_lower and len(words) > 0:
-                # Check if first word is same as last recent word
-                if words[0].lower() == recent_lower[-1]:
-                    start_index = 1
-            
-            # Extract only new words
-            if start_index < len(words):
-                new_words = words[start_index:]
-            
-            # Update recent words list
-            if new_words:
-                self.recent_words.extend(new_words)
-                
-                # Keep only the most recent words to prevent memory buildup
-                if len(self.recent_words) > self.max_recent_words:
-                    self.recent_words = self.recent_words[-self.max_recent_words:]
+        for old, new in artifacts:
+            cleaned = cleaned.replace(old, new)
         
-        return " ".join(new_words) if new_words else ""
+        return cleaned.strip()
     
     def is_streaming_active(self) -> bool:
         """Check if streaming transcription is active"""

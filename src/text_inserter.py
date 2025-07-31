@@ -1,6 +1,8 @@
 import pyautogui
 import time
 import threading
+import subprocess
+import shlex
 from typing import Optional, Callable
 
 class TextInserter:
@@ -172,22 +174,87 @@ class TextInserter:
                 
                 if text_to_type:
                     self._type_text_immediately(text_to_type)
+                    # Add longer delay after typing to prevent overwhelming the system
+                    time.sleep(0.5)  # 500ms delay between text chunks
                 else:
                     # Small sleep to prevent excessive CPU usage
-                    time.sleep(0.05)
+                    time.sleep(0.1)
                     
             except Exception as e:
                 print(f"Error in live typing processor: {e}")
-                time.sleep(0.1)
+                time.sleep(0.3)
     
     def _type_text_immediately(self, text: str) -> bool:
-        """Type text immediately at current cursor position"""
+        """Type text immediately at current cursor position using native macOS typing"""
         try:
-            # No delay - type immediately for live experience
-            pyautogui.typewrite(text, interval=0.02)  # Fast typing speed
-            return True
+            # Clean and prepare text
+            cleaned_text = self._clean_text_for_typing(text)
+            if not cleaned_text:
+                return True
+            
+            # Use native macOS typing via AppleScript for proper keyboard layout support
+            return self._type_with_applescript(cleaned_text)
+            
         except Exception as e:
             print(f"Failed to type text immediately: {e}")
+            # Fallback to pyautogui as last resort
+            try:
+                pyautogui.typewrite(text, interval=0.1)
+                return True
+            except Exception as e2:
+                print(f"All typing methods failed: {e2}")
+                return False
+    
+    def _clean_text_for_typing(self, text: str) -> str:
+        """Clean and normalize text before typing"""
+        if not text:
+            return ""
+        
+        # Remove any control characters and normalize whitespace
+        cleaned = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
+        
+        # Normalize multiple spaces to single space
+        cleaned = ' '.join(cleaned.split())
+        
+        # Remove any problematic characters that might cause issues
+        problematic_chars = ['', '', '', '']  # Various control characters
+        for char in problematic_chars:
+            cleaned = cleaned.replace(char, '')
+        
+        return cleaned.strip()
+    
+    def _type_with_applescript(self, text: str) -> bool:
+        """Use AppleScript to type text with proper keyboard layout support"""
+        try:
+            # Escape text for AppleScript (handle quotes and backslashes)
+            escaped_text = text.replace('\\', '\\\\').replace('"', '\\"')
+            
+            # Create AppleScript command to type the text
+            applescript = f'''
+            tell application "System Events"
+                keystroke "{escaped_text}"
+            end tell
+            '''
+            
+            # Execute AppleScript via osascript
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                return True
+            else:
+                print(f"AppleScript typing failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            print("AppleScript typing timed out")
+            return False
+        except Exception as e:
+            print(f"AppleScript typing error: {e}")
             return False
     
     def is_live_typing_active(self) -> bool:
