@@ -5,9 +5,10 @@ import numpy as np
 from typing import Optional, Callable
 
 class AudioRecorder:
-    def __init__(self, sample_rate: int = 16000, channels: int = 1):
+    def __init__(self, sample_rate: int = 16000, channels: int = 1, device_id: Optional[int] = None):
         self.sample_rate = sample_rate
         self.channels = channels
+        self.device_id = device_id
         self.recording = False
         self.audio_queue = queue.Queue()
         self.stream: Optional[sd.InputStream] = None
@@ -21,16 +22,22 @@ class AudioRecorder:
     def start_recording(self) -> bool:
         try:
             self.recording = True
-            self.stream = sd.InputStream(
-                samplerate=self.sample_rate,
-                channels=self.channels,
-                callback=self._audio_callback,
-                dtype=np.float32
-            )
+            stream_params = {
+                'samplerate': self.sample_rate,
+                'channels': self.channels,
+                'callback': self._audio_callback,
+                'dtype': np.float32
+            }
+            
+            # Add device parameter if specified
+            if self.device_id is not None:
+                stream_params['device'] = self.device_id
+            
+            self.stream = sd.InputStream(**stream_params)
             self.stream.start()
             return True
         except Exception as e:
-            print(f"Failed to start recording: {e}")
+            print(f"Failed to start recording with device {self.device_id}: {e}")
             self.recording = False
             return False
     
@@ -58,3 +65,18 @@ class AudioRecorder:
     @staticmethod
     def get_available_devices():
         return sd.query_devices()
+    
+    @staticmethod
+    def get_input_devices():
+        """Get only input devices that can be used for recording"""
+        devices = sd.query_devices()
+        input_devices = []
+        for i, device in enumerate(devices):
+            if device['max_input_channels'] > 0:
+                input_devices.append({
+                    'index': i,
+                    'name': device['name'],
+                    'channels': device['max_input_channels'],
+                    'default_samplerate': device['default_samplerate']
+                })
+        return input_devices

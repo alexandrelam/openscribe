@@ -7,6 +7,132 @@ from .transcription import TranscriptionEngine
 from .text_inserter import TextInserter
 from .config import Config
 
+
+class SettingsDialog:
+    def __init__(self, parent, config: Config, on_config_changed: Callable[[Config], None]):
+        self.parent = parent
+        self.config = config
+        self.on_config_changed = on_config_changed
+        self.result = None
+        
+        self.window = tk.Toplevel(parent)
+        self.window.title("Settings")
+        self.window.geometry("400x300")
+        self.window.resizable(False, False)
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        # Center the window
+        self.window.update_idletasks()
+        x = (self.window.winfo_screenwidth() // 2) - (400 // 2)
+        y = (self.window.winfo_screenheight() // 2) - (300 // 2)
+        self.window.geometry(f"400x300+{x}+{y}")
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        main_frame = ttk.Frame(self.window, padding="20")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Microphone selection
+        ttk.Label(main_frame, text="Microphone Device:", font=("Arial", 12, "bold")).grid(
+            row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        self.device_var = tk.StringVar()
+        self.device_combo = ttk.Combobox(main_frame, textvariable=self.device_var, state="readonly", width=50)
+        self.device_combo.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 20))
+        
+        # Load available devices
+        self.load_devices()
+        
+        # Auto-insert settings
+        ttk.Label(main_frame, text="Auto-Insert Settings:", font=("Arial", 12, "bold")).grid(
+            row=2, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        self.auto_insert_var = tk.BooleanVar(value=self.config.enable_auto_insert)
+        ttk.Checkbutton(main_frame, text="Enable auto-insert on click", 
+                       variable=self.auto_insert_var).grid(
+            row=3, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        ttk.Label(main_frame, text="Auto-insert timeout (seconds):").grid(
+            row=4, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.timeout_var = tk.StringVar(value=str(self.config.auto_insert_timeout))
+        timeout_spinbox = ttk.Spinbox(main_frame, from_=5, to=60, textvariable=self.timeout_var, width=10)
+        timeout_spinbox.grid(row=4, column=1, sticky=tk.W, pady=(0, 20))
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=(20, 0))
+        
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(10, 0))
+        ttk.Button(button_frame, text="Save", command=self.save).pack(side=tk.RIGHT)
+        
+        self.window.columnconfigure(0, weight=1)
+        self.window.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        
+    def load_devices(self):
+        try:
+            devices = AudioRecorder.get_input_devices()
+            device_options = ["Default (System Default)"]
+            device_indices = [None]
+            
+            for device in devices:
+                device_options.append(f"{device['name']} (Device {device['index']})")
+                device_indices.append(device['index'])
+            
+            self.device_combo['values'] = device_options
+            self.device_indices = device_indices
+            
+            # Set current selection
+            if self.config.microphone_device is None:
+                self.device_combo.current(0)
+            else:
+                try:
+                    index = device_indices.index(self.config.microphone_device)
+                    self.device_combo.current(index)
+                except ValueError:
+                    self.device_combo.current(0)
+                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load audio devices: {e}")
+            self.device_combo['values'] = ["Default (System Default)"]
+            self.device_indices = [None]
+            self.device_combo.current(0)
+    
+    def save(self):
+        try:
+            # Get selected device
+            selected_index = self.device_combo.current()
+            selected_device = self.device_indices[selected_index] if selected_index >= 0 else None
+            
+            # Update config
+            self.config.microphone_device = selected_device
+            self.config.enable_auto_insert = self.auto_insert_var.get()
+            self.config.auto_insert_timeout = int(self.timeout_var.get())
+            
+            # Save config
+            self.config.save()
+            
+            # Notify parent
+            self.on_config_changed(self.config)
+            
+            self.result = "saved"
+            self.window.destroy()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {e}")
+    
+    def cancel(self):
+        self.result = "cancelled"
+        self.window.destroy()
+
 class SpeechToTextGUI:
     def __init__(self):
         self.root = tk.Tk()
@@ -15,7 +141,7 @@ class SpeechToTextGUI:
         self.root.resizable(False, False)
         
         self.config = Config.load()
-        self.audio_recorder = AudioRecorder()
+        self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
         self.transcription_engine = TranscriptionEngine()
         self.text_inserter = TextInserter()
         
@@ -166,7 +292,23 @@ class SpeechToTextGUI:
         self.root.after(3000, lambda: self.status_label.config(text="Ready"))
     
     def show_settings(self):
-        messagebox.showinfo("Settings", "Settings panel coming soon!")
+        SettingsDialog(self.root, self.config, self.on_config_changed)
+    
+    def on_config_changed(self, new_config: Config):
+        """Handle config changes from settings dialog"""
+        self.config = new_config
+        
+        # Recreate AudioRecorder with new device if it changed
+        old_device = getattr(self.audio_recorder, 'device_id', None)
+        if old_device != self.config.microphone_device:
+            # Only recreate if not currently recording
+            if not self.recording:
+                self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
+                messagebox.showinfo("Settings", "Microphone device updated successfully!")
+            else:
+                messagebox.showwarning("Settings", "Settings saved. Microphone device will be updated after current recording stops.")
+        else:
+            messagebox.showinfo("Settings", "Settings saved successfully!")
     
     def quit_app(self):
         if self.recording:
