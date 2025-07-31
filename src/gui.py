@@ -7,6 +7,7 @@ from .transcription import TranscriptionEngine
 from .text_inserter import TextInserter
 from .config import Config
 from .recording_indicator import RecordingIndicator, IndicatorState
+from .double_key_shortcuts import DoubleKeyDetector
 
 
 class SettingsDialog:
@@ -315,17 +316,23 @@ class SpeechToTextGUI:
             opacity=self.config.indicator_opacity
         )
         
+        # Initialize double key detector
+        self.double_key_detector = DoubleKeyDetector(
+            double_press_timeout=self.config.double_press_timeout
+        )
+        
         # Apply configurations on startup
         self._apply_vad_config()
         self._apply_paste_config()
         self._apply_language_config()
+        self._apply_shortcuts_config()
         
         self.recording = False
         self.processing = False
         self.live_mode_active = False
         
         self.setup_ui()
-        self.setup_hotkeys()
+        self.setup_all_shortcuts()
         
         # Start recording indicator if enabled
         if self.config.show_recording_indicator:
@@ -377,12 +384,22 @@ class SpeechToTextGUI:
         main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
     
-    def setup_hotkeys(self):
+    def setup_all_shortcuts(self):
+        """Setup both traditional hotkeys and double key press shortcuts"""
+        # Setup traditional hotkey (cmd+shift+r)
+        self._setup_traditional_hotkey()
+        
+        # Setup double key press shortcuts if enabled
+        if self.config.double_press_enabled:
+            self._setup_double_key_shortcuts()
+    
+    def _setup_traditional_hotkey(self):
+        """Setup the traditional cmd+shift+r hotkey"""
         try:
             from pynput import keyboard
             
             def on_hotkey():
-                self.root.after(0, self.toggle_recording)
+                self.root.after(0, lambda: self.toggle_recording_with_source("hotkey"))
             
             hotkey = keyboard.HotKey(
                 keyboard.HotKey.parse('<cmd>+<shift>+r'),
@@ -392,38 +409,71 @@ class SpeechToTextGUI:
             def for_canonical(f):
                 return lambda k: f(listener.canonical(k))
             
-            listener = keyboard.Listener(
+            self.hotkey_listener = keyboard.Listener(
                 on_press=for_canonical(hotkey.press),
                 on_release=for_canonical(hotkey.release)
             )
-            listener.start()
+            self.hotkey_listener.start()
             
         except Exception as e:
-            print(f"Failed to setup hotkeys: {e}")
+            print(f"Failed to setup traditional hotkey: {e}")
     
-    def toggle_recording(self):
+    def _setup_double_key_shortcuts(self):
+        """Setup double key press shortcuts"""
+        try:
+            # Set callback functions for double key presses
+            self.double_key_detector.set_callbacks(
+                on_double_shift=lambda: self.root.after(0, lambda: self.toggle_recording_with_source("double_shift")),
+                on_double_control=lambda: self.root.after(0, lambda: self.toggle_live_mode_with_source("double_control"))
+            )
+            
+            # Start the double key detector
+            self.double_key_detector.start()
+            
+        except Exception as e:
+            print(f"Failed to setup double key shortcuts: {e}")
+    
+    def toggle_recording_with_source(self, source: str = "button"):
+        """Toggle recording with source information for status messages"""
         if self.processing or self.live_mode_active:
             return
             
         if not self.recording:
-            self.start_recording()
+            self.start_recording(source)
         else:
-            self.stop_recording()
+            self.stop_recording(source)
     
-    def toggle_live_mode(self):
+    def toggle_live_mode_with_source(self, source: str = "button"):
+        """Toggle live mode with source information for status messages"""
         if self.processing or self.recording:
             return
         
         if not self.live_mode_active:
-            self.start_live_mode()
+            self.start_live_mode(source)
         else:
-            self.stop_live_mode()
+            self.stop_live_mode(source)
     
-    def start_recording(self):
+    def toggle_recording(self):
+        """Legacy method for backward compatibility"""
+        self.toggle_recording_with_source("button")
+    
+    def toggle_live_mode(self):
+        """Legacy method for backward compatibility"""
+        self.toggle_live_mode_with_source("button")
+    
+    def start_recording(self, source: str = "button"):
         if self.audio_recorder.start_recording():
             self.recording = True
             self.record_button.config(text="⏹️ Stop Recording", style="Accent.TButton")
-            self.status_label.config(text="🔴 Recording... Speak now!")
+            
+            # Show source-specific status message
+            if source == "double_shift":
+                self.status_label.config(text="🔴 Recording (Double Shift)... Speak now!")
+            elif source == "hotkey":
+                self.status_label.config(text="🔴 Recording (Cmd+Shift+R)... Speak now!")
+            else:
+                self.status_label.config(text="🔴 Recording... Speak now!")
+            
             self.progress.start()
             
             # Update indicator state
@@ -432,7 +482,7 @@ class SpeechToTextGUI:
         else:
             messagebox.showerror("Error", "Failed to start recording. Check microphone permissions.")
     
-    def stop_recording(self):
+    def stop_recording(self, source: str = "button"):
         if not self.recording:
             return
             
@@ -535,6 +585,7 @@ class SpeechToTextGUI:
                 self._apply_paste_config()
                 self._apply_language_config()
                 self._apply_indicator_config()
+                self._apply_shortcuts_config()
                 messagebox.showinfo("Settings", "All settings updated successfully!")
             else:
                 messagebox.showwarning("Settings", "Settings saved. Microphone device will be updated after current recording stops.")
@@ -544,6 +595,7 @@ class SpeechToTextGUI:
             self._apply_paste_config()
             self._apply_language_config()
             self._apply_indicator_config()
+            self._apply_shortcuts_config()
             messagebox.showinfo("Settings", "Settings saved successfully!")
     
     def _apply_vad_config(self):
@@ -593,6 +645,22 @@ class SpeechToTextGUI:
                 if self.recording_indicator.is_running:
                     self.recording_indicator.stop()
     
+    def _apply_shortcuts_config(self):
+        """Apply shortcuts configuration"""
+        if hasattr(self, 'double_key_detector'):
+            # Update double key detector timeout
+            self.double_key_detector.configure(
+                double_press_timeout=self.config.double_press_timeout
+            )
+            
+            # Start or stop double key detection based on config
+            if self.config.double_press_enabled:
+                if not self.double_key_detector.running:
+                    self._setup_double_key_shortcuts()
+            else:
+                if self.double_key_detector.running:
+                    self.double_key_detector.stop()
+    
     def _update_language_display(self):
         """Update the language information display"""
         if self.transcription_engine and self.config.language_detection_enabled:
@@ -614,7 +682,7 @@ class SpeechToTextGUI:
         else:
             self.language_label.config(text="")
     
-    def start_live_mode(self):
+    def start_live_mode(self, source: str = "button"):
         """Start live transcription mode with real-time typing"""
         try:
             # Start transcription engine streaming
@@ -630,7 +698,13 @@ class SpeechToTextGUI:
                 self.live_mode_active = True
                 self.live_button.config(text="⏹️ Stop Live", style="Accent.TButton")
                 self.record_button.config(state="disabled")
-                self.status_label.config(text="🔴 Live Mode: Speak and text will appear at cursor!")
+                
+                # Show source-specific status message
+                if source == "double_control":
+                    self.status_label.config(text="🔴 Live Mode (Double Ctrl): Speak and text will appear at cursor!")
+                else:
+                    self.status_label.config(text="🔴 Live Mode: Speak and text will appear at cursor!")
+                
                 self.progress.start()
                 
                 # Update indicator to live mode state
@@ -645,7 +719,7 @@ class SpeechToTextGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to start live mode: {e}")
     
-    def stop_live_mode(self):
+    def stop_live_mode(self, source: str = "button"):
         """Stop live transcription mode"""
         if not self.live_mode_active:
             return
@@ -693,6 +767,14 @@ class SpeechToTextGUI:
         # Stop recording indicator
         if hasattr(self, 'recording_indicator'):
             self.recording_indicator.stop()
+        
+        # Stop double key detector
+        if hasattr(self, 'double_key_detector'):
+            self.double_key_detector.stop()
+        
+        # Stop traditional hotkey listener
+        if hasattr(self, 'hotkey_listener'):
+            self.hotkey_listener.stop()
         
         self.root.quit()
     

@@ -42,6 +42,11 @@ This is a real-time speech-to-text desktop application with both traditional rec
 - Settings dialog for all configuration options
 - Real-time language display and status updates
 
+**DoubleKeyDetector** (`src/double_key_shortcuts.py`)
+- Double Shift → Toggle recording mode
+- Double Control → Toggle live mode
+- Configurable timing window (default 500ms)
+
 ### Data Flow
 
 **Traditional Mode**: User clicks record → Audio captured → Whisper transcription → Clipboard paste on click
@@ -81,4 +86,8 @@ Config automatically persists to `config.json`:
 - `indicator_position_y`: Screen Y position (pixels)
 - `indicator_size`: Indicator size (pixels)
 - `indicator_opacity`: Transparency (0.0-1.0)
+
+### Double Key Shortcuts Settings
+- `double_press_enabled`: Enable/disable double key shortcuts
+- `double_press_timeout`: Time window for double press detection (seconds)
 

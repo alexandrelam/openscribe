@@ -21,6 +21,7 @@ An advanced real-time speech-to-text desktop application with Voice Activity Det
 ✅ **Comprehensive Configuration**: Language, VAD parameters, paste behavior  
 ✅ **Real-time Language Display**: Shows detected language and confidence  
 ✅ **Multiple Paste Methods**: AppleScript (primary) with keyboard fallback  
+✅ **Double Key Press Shortcuts**: Quick mode activation with double Shift/Control  
 ✅ **International Keyboard Support**: Proper handling of French AZERTY, etc.  
 
 ## 🚀 Quick Start
@@ -102,15 +103,17 @@ vibe --version
 
 1. **Traditional Recording Mode:**
    - Click "🎤 Start Recording" or press Cmd+Shift+R
+   - **NEW: Double-tap Shift** for quick activation
    - Speak into your microphone
-   - Click "⏹️ Stop Recording" or press Cmd+Shift+R again
+   - Click "⏹️ Stop Recording" or press Cmd+Shift+R again (or double-tap Shift)
    - Click to insert text into focused input field
 
 2. **Live Streaming Mode:**
    - Click "🔴 Live Mode"
+   - **NEW: Double-tap Control** for quick activation
    - Speak continuously
    - Text appears in real-time at cursor position
-   - Click "⏹️ Stop Live" to end
+   - Click "⏹️ Stop Live" to end (or double-tap Control)
 
 3. **Configuration:**
    - Click "Settings" to configure:
@@ -118,6 +121,7 @@ vibe --version
      - **Model Size**: Balance between speed and accuracy
      - **VAD Parameters**: Speech detection sensitivity
      - **Paste Behavior**: Clipboard method and timing
+     - **Double Key Shortcuts**: Enable/disable and timing (default 500ms)
 
 ### CLI Interface
 
@@ -150,6 +154,7 @@ speech-to-text/
 │   ├── transcription.py   # Multilingual whisper engine
 │   ├── text_inserter.py   # Clipboard-based text insertion
 │   ├── vad_chunker.py     # Voice Activity Detection
+│   ├── double_key_shortcuts.py  # Double key press detection
 │   └── config.py          # Configuration management
 └── venv/                # Virtual environment
 ```
@@ -256,12 +261,12 @@ pip install -r requirements.txt
 ✅ **Real-time Transcription**: Live streaming mode with instant text insertion  
 ✅ **Voice Activity Detection**: Intelligent chunking for 60-80% performance improvement  
 ✅ **Advanced Text Insertion**: Clipboard-based with backup/restore  
+✅ **Double Key Press Shortcuts**: Quick activation with double Shift/Control  
 ✅ **Global Command Access**: Install once, use `vibe` from anywhere  
 ✅ **Comprehensive Settings**: Language, model size, VAD parameters, paste behavior  
 
 ## 🔮 Future Enhancements
 
-- [ ] Custom hotkey configuration in GUI
 - [ ] Audio playback for verification before insertion
 - [ ] Transcription history and session management
 - [ ] System tray integration for background operation
@@ -269,6 +274,7 @@ pip install -r requirements.txt
 - [ ] Batch file transcription mode
 - [ ] Real-time translation between languages
 - [ ] Voice commands for application control
+- [ ] Custom hotkey configuration in GUI (partially implemented with double key shortcuts)
 
 ## License
 

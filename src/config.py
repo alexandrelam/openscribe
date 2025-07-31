@@ -39,6 +39,10 @@ class Config:
     indicator_size: int = 20  # size of the indicator in pixels
     indicator_opacity: float = 0.9  # transparency of the indicator (0.0-1.0)
     
+    # Double key press shortcuts configuration
+    double_press_enabled: bool = True  # enable double key press shortcuts
+    double_press_timeout: float = 0.5  # maximum time between presses (seconds)
+    
     CONFIG_FILE = "config.json"
     
     @classmethod
