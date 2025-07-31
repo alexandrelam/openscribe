@@ -43,6 +43,10 @@ class Config:
     double_press_enabled: bool = True  # enable double key press shortcuts
     double_press_timeout: float = 0.5  # maximum time between presses (seconds)
     
+    # Sound notifications configuration
+    sound_notifications_enabled: bool = True  # enable sound notifications
+    sound_volume: float = 0.5  # volume level (0.0-1.0)
+    
     CONFIG_FILE = "config.json"
     
     @classmethod

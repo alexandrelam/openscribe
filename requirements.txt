@@ -5,3 +5,4 @@ faster-whisper
 soundfile
 pyperclip
 webrtcvad
+numpy
