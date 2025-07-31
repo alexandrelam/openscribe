@@ -17,7 +17,7 @@ class SettingsDialog:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Settings")
-        self.window.geometry("400x300")
+        self.window.geometry("400x450")
         self.window.resizable(False, False)
         self.window.transient(parent)
         self.window.grab_set()
@@ -25,8 +25,8 @@ class SettingsDialog:
         # Center the window
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() // 2) - (400 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (300 // 2)
-        self.window.geometry(f"400x300+{x}+{y}")
+        y = (self.window.winfo_screenheight() // 2) - (450 // 2)
+        self.window.geometry(f"400x450+{x}+{y}")
         
         self.setup_ui()
         
@@ -65,9 +65,46 @@ class SettingsDialog:
         timeout_spinbox = ttk.Spinbox(main_frame, from_=5, to=60, textvariable=self.timeout_var, width=10)
         timeout_spinbox.grid(row=4, column=1, sticky=tk.W, pady=(0, 20))
         
+        # VAD settings
+        ttk.Label(main_frame, text="Voice Activity Detection:", font=("Arial", 12, "bold")).grid(
+            row=5, column=0, columnspan=2, sticky=tk.W, pady=(0, 10)
+        )
+        
+        ttk.Label(main_frame, text="Aggressiveness (0-3):").grid(
+            row=6, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.vad_aggressiveness_var = tk.StringVar(value=str(self.config.vad_aggressiveness))
+        aggressiveness_spinbox = ttk.Spinbox(main_frame, from_=0, to=3, textvariable=self.vad_aggressiveness_var, width=10)
+        aggressiveness_spinbox.grid(row=6, column=1, sticky=tk.W, pady=(0, 5))
+        
+        ttk.Label(main_frame, text="Min chunk duration (s):").grid(
+            row=7, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.vad_min_duration_var = tk.StringVar(value=str(self.config.vad_min_chunk_duration))
+        min_duration_spinbox = ttk.Spinbox(main_frame, from_=0.5, to=5.0, increment=0.1, textvariable=self.vad_min_duration_var, width=10)
+        min_duration_spinbox.grid(row=7, column=1, sticky=tk.W, pady=(0, 5))
+        
+        ttk.Label(main_frame, text="Max chunk duration (s):").grid(
+            row=8, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.vad_max_duration_var = tk.StringVar(value=str(self.config.vad_max_chunk_duration))
+        max_duration_spinbox = ttk.Spinbox(main_frame, from_=5.0, to=30.0, increment=1.0, textvariable=self.vad_max_duration_var, width=10)
+        max_duration_spinbox.grid(row=8, column=1, sticky=tk.W, pady=(0, 5))
+        
+        ttk.Label(main_frame, text="Silence timeout (s):").grid(
+            row=9, column=0, sticky=tk.W, pady=(0, 5)
+        )
+        
+        self.vad_silence_timeout_var = tk.StringVar(value=str(self.config.vad_silence_timeout))
+        silence_timeout_spinbox = ttk.Spinbox(main_frame, from_=0.1, to=2.0, increment=0.1, textvariable=self.vad_silence_timeout_var, width=10)
+        silence_timeout_spinbox.grid(row=9, column=1, sticky=tk.W, pady=(0, 20))
+        
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=(20, 0))
+        button_frame.grid(row=10, column=0, columnspan=2, pady=(20, 0))
         
         ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(10, 0))
         ttk.Button(button_frame, text="Save", command=self.save).pack(side=tk.RIGHT)
@@ -117,6 +154,12 @@ class SettingsDialog:
             self.config.enable_auto_insert = self.auto_insert_var.get()
             self.config.auto_insert_timeout = int(self.timeout_var.get())
             
+            # Update VAD config
+            self.config.vad_aggressiveness = int(self.vad_aggressiveness_var.get())
+            self.config.vad_min_chunk_duration = float(self.vad_min_duration_var.get())
+            self.config.vad_max_chunk_duration = float(self.vad_max_duration_var.get())
+            self.config.vad_silence_timeout = float(self.vad_silence_timeout_var.get())
+            
             # Save config
             self.config.save()
             
@@ -144,6 +187,9 @@ class SpeechToTextGUI:
         self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
         self.transcription_engine = TranscriptionEngine()
         self.text_inserter = TextInserter()
+        
+        # Apply VAD configuration on startup
+        self._apply_vad_config()
         
         self.recording = False
         self.processing = False
@@ -324,11 +370,24 @@ class SpeechToTextGUI:
             # Only recreate if not currently recording
             if not self.recording:
                 self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
-                messagebox.showinfo("Settings", "Microphone device updated successfully!")
+                self._apply_vad_config()
+                messagebox.showinfo("Settings", "Microphone device and VAD settings updated successfully!")
             else:
                 messagebox.showwarning("Settings", "Settings saved. Microphone device will be updated after current recording stops.")
         else:
+            # Apply VAD configuration to existing recorder
+            self._apply_vad_config()
             messagebox.showinfo("Settings", "Settings saved successfully!")
+    
+    def _apply_vad_config(self):
+        """Apply VAD configuration to the audio recorder"""
+        if self.audio_recorder:
+            self.audio_recorder.configure_vad(
+                aggressiveness=self.config.vad_aggressiveness,
+                min_chunk_duration=self.config.vad_min_chunk_duration,
+                max_chunk_duration=self.config.vad_max_chunk_duration,
+                silence_timeout=self.config.vad_silence_timeout
+            )
     
     def start_live_mode(self):
         """Start live transcription mode with real-time typing"""

@@ -13,6 +13,12 @@ class Config:
     enable_auto_insert: bool = True
     auto_insert_timeout: int = 10
     
+    # VAD configuration
+    vad_aggressiveness: int = 2  # 0-3, higher = more aggressive
+    vad_min_chunk_duration: float = 1.0  # minimum seconds per chunk
+    vad_max_chunk_duration: float = 10.0  # maximum seconds per chunk
+    vad_silence_timeout: float = 0.5  # seconds of silence before processing chunk
+    
     CONFIG_FILE = "config.json"
     
     @classmethod

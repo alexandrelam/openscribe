@@ -163,7 +163,7 @@ class TranscriptionEngine:
             return None
     
     def _assemble_text_chunk(self, new_text: str) -> str:
-        """Assemble new text chunk with existing buffer using sequence-based overlap detection"""
+        """Assemble new text chunk with existing buffer (simplified for VAD-based chunks)"""
         if not new_text:
             return ""
         
@@ -178,70 +178,21 @@ class TranscriptionEngine:
                 self.text_buffer = cleaned_new
                 return cleaned_new
             
-            # Find overlap between buffer end and new text start
-            overlap_result = self._find_text_overlap(self.text_buffer, cleaned_new)
+            # Since VAD provides natural speech boundaries, we can simplify assembly
+            # Just add proper spacing between chunks
+            spaced_text = cleaned_new
             
-            if overlap_result:
-                # Merge texts by removing overlap from new text
-                buffer_end, new_start, overlap_length = overlap_result
-                
-                # Remove overlapping part from new text
-                truly_new_text = cleaned_new[overlap_length:].strip()
-                
-                # Always add space before new text unless buffer ends with punctuation
-                if truly_new_text:
-                    if not self.text_buffer.endswith((' ', '.', ',', '!', '?', ';', ':')):
-                        truly_new_text = ' ' + truly_new_text
-                    elif self.text_buffer.endswith(('.', '!', '?')) and truly_new_text and truly_new_text[0].islower():
-                        # Add space after sentence-ending punctuation
-                        truly_new_text = ' ' + truly_new_text
-                
-                # Update buffer
-                if truly_new_text:
-                    self.text_buffer += truly_new_text
-                    return truly_new_text
-                else:
-                    return ""  # All text was duplicate
-            else:
-                # No overlap found, add with spacing
-                spaced_text = cleaned_new
-                if not self.text_buffer.endswith(' ') and not cleaned_new.startswith(' '):
-                    spaced_text = ' ' + cleaned_new
-                
-                self.text_buffer += spaced_text
-                return spaced_text
+            # Add space if needed between chunks
+            if not self.text_buffer.endswith((' ', '.', ',', '!', '?', ';', ':')):
+                spaced_text = ' ' + cleaned_new
+            elif self.text_buffer.endswith(('.', '!', '?')) and cleaned_new and cleaned_new[0].islower():
+                # Add space after sentence-ending punctuation  
+                spaced_text = ' ' + cleaned_new
+            
+            # Update buffer
+            self.text_buffer += spaced_text
+            return spaced_text
     
-    def _find_text_overlap(self, buffer_text: str, new_text: str):
-        """Find overlapping sequence between buffer end and new text start"""
-        if not buffer_text or not new_text:
-            return None
-        
-        # Convert to words for better matching
-        buffer_words = buffer_text.split()
-        new_words = new_text.split()
-        
-        if not buffer_words or not new_words:
-            return None
-        
-        # Look for longest overlap (check longer overlaps first)
-        max_overlap_len = min(len(buffer_words), len(new_words), 8)  # Limit to 8 words max
-        
-        for overlap_len in range(max_overlap_len, 0, -1):
-            # Get last N words from buffer
-            buffer_end = buffer_words[-overlap_len:]
-            # Get first N words from new text  
-            new_start = new_words[:overlap_len]
-            
-            # Compare word sequences (case-insensitive)
-            buffer_end_lower = [w.lower().strip('.,!?;:') for w in buffer_end]
-            new_start_lower = [w.lower().strip('.,!?;:') for w in new_start]
-            
-            if buffer_end_lower == new_start_lower:
-                # Found overlap - calculate character position
-                overlap_chars = len(' '.join(new_words[:overlap_len]))
-                return (buffer_end, new_start, overlap_chars)
-        
-        return None
     
     def _preprocess_text(self, text: str) -> str:
         """Clean and preprocess text before deduplication"""

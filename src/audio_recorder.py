@@ -4,6 +4,7 @@ import sounddevice as sd
 import numpy as np
 import time
 from typing import Optional, Callable
+from .vad_chunker import VADChunker
 
 class AudioRecorder:
     def __init__(self, sample_rate: int = 16000, channels: int = 1, device_id: Optional[int] = None):
@@ -15,11 +16,15 @@ class AudioRecorder:
         self.audio_queue = queue.Queue()
         self.stream: Optional[sd.InputStream] = None
         
-        # Streaming mode configuration
-        self.chunk_duration = 3.0  # seconds per chunk
-        self.overlap_duration = 1.5  # seconds of overlap
+        # VAD-based streaming mode configuration
+        self.vad_aggressiveness = 2  # 0-3, higher = more aggressive
+        self.min_chunk_duration = 1.0  # minimum seconds per chunk
+        self.max_chunk_duration = 10.0  # maximum seconds per chunk
+        self.silence_timeout = 0.5  # seconds of silence before processing chunk
+        
         self.streaming_callback: Optional[Callable[[np.ndarray], None]] = None
-        self.chunk_buffer = []
+        self.vad_chunker: Optional[VADChunker] = None
+        self.audio_buffer = []
         self.buffer_lock = threading.Lock()
         self.streaming_thread: Optional[threading.Thread] = None
         self.streaming_stop_event = threading.Event()
@@ -33,7 +38,7 @@ class AudioRecorder:
         
         if self.streaming:
             with self.buffer_lock:
-                self.chunk_buffer.append(indata.copy())
+                self.audio_buffer.append(indata.copy())
     
     def start_recording(self) -> bool:
         try:
@@ -79,12 +84,22 @@ class AudioRecorder:
         return self.recording
     
     def start_streaming_recording(self, callback: Callable[[np.ndarray], None]) -> bool:
-        """Start streaming recording that processes audio chunks in real-time"""
+        """Start streaming recording that processes audio chunks using VAD"""
         try:
             self.streaming = True
             self.streaming_callback = callback
-            self.chunk_buffer = []
+            self.audio_buffer = []
             self.streaming_stop_event.clear()
+            
+            # Initialize VAD chunker
+            self.vad_chunker = VADChunker(
+                sample_rate=self.sample_rate,
+                aggressiveness=self.vad_aggressiveness,
+                min_chunk_duration=self.min_chunk_duration,
+                max_chunk_duration=self.max_chunk_duration,  
+                silence_timeout=self.silence_timeout
+            )
+            self.vad_chunker.set_chunk_callback(callback)
             
             # Start audio stream
             stream_params = {
@@ -127,59 +142,69 @@ class AudioRecorder:
             self.streaming_thread.join(timeout=2.0)
         
         self.streaming_callback = None
-        self.chunk_buffer = []
+        
+        # Force process any remaining audio and cleanup VAD
+        if self.vad_chunker:
+            self.vad_chunker.force_chunk()
+            self.vad_chunker = None
+            
+        self.audio_buffer = []
     
     def _streaming_processor(self):
-        """Process audio chunks in real-time for streaming transcription"""
-        chunk_samples = int(self.chunk_duration * self.sample_rate)
-        overlap_samples = int(self.overlap_duration * self.sample_rate)
-        process_interval = self.chunk_duration - self.overlap_duration  # 1.5 seconds
+        """Process audio using VAD-based chunking for streaming transcription"""
+        print("🎤 Starting VAD-based streaming processor")
         
+        # Process interval for checking audio buffer  
+        process_interval = 0.1  # Check every 100ms
         last_process_time = time.time()
-        processed_samples = 0
         
         while not self.streaming_stop_event.is_set():
             current_time = time.time()
             
-            # Check if it's time to process a new chunk
+            # Check if it's time to process buffered audio
             if current_time - last_process_time >= process_interval:
                 with self.buffer_lock:
-                    if self.chunk_buffer:
+                    if self.audio_buffer and self.vad_chunker:
                         # Combine all buffered audio
-                        combined_audio = np.concatenate(self.chunk_buffer, axis=0)
+                        combined_audio = np.concatenate(self.audio_buffer, axis=0)
                         
-                        # Check if we have enough audio for a chunk
-                        if len(combined_audio) >= chunk_samples:
-                            # Extract chunk starting from appropriate position
-                            start_sample = max(0, processed_samples - overlap_samples)
-                            end_sample = start_sample + chunk_samples
-                            
-                            if end_sample <= len(combined_audio):
-                                chunk = combined_audio[start_sample:end_sample]
-                                processed_samples = end_sample - overlap_samples
-                                
-                                # Process this chunk
-                                if self.streaming_callback:
-                                    try:
-                                        self.streaming_callback(chunk)
-                                    except Exception as e:
-                                        print(f"Error in streaming callback: {e}")
-                                
-                                last_process_time = current_time
-                            
-                            # Clean old buffer data to prevent memory buildup
-                            # Keep only recent data needed for next overlap
-                            keep_samples = chunk_samples  # Keep enough for next chunk
-                            if len(combined_audio) > keep_samples * 2:
-                                recent_start = len(combined_audio) - keep_samples
-                                self.chunk_buffer = [combined_audio[recent_start:]]
-                                processed_samples = max(0, processed_samples - recent_start)
+                        # Process through VAD chunker
+                        try:
+                            self.vad_chunker.process_audio(combined_audio.flatten())
+                        except Exception as e:
+                            print(f"❌ Error in VAD processing: {e}")
+                        
+                        # Clear processed buffer
+                        self.audio_buffer = []
+                        
+                last_process_time = current_time
             
             # Small sleep to prevent excessive CPU usage
-            time.sleep(0.1)
+            time.sleep(0.05)
     
     def is_streaming(self) -> bool:
         return self.streaming
+    
+    def configure_vad(self, 
+                     aggressiveness: int = 2,
+                     min_chunk_duration: float = 1.0,
+                     max_chunk_duration: float = 10.0,
+                     silence_timeout: float = 0.5):
+        """Configure VAD parameters"""
+        self.vad_aggressiveness = aggressiveness
+        self.min_chunk_duration = min_chunk_duration
+        self.max_chunk_duration = max_chunk_duration
+        self.silence_timeout = silence_timeout
+        
+        print(f"🔧 VAD configured: aggressiveness={aggressiveness}, "
+              f"chunk_range={min_chunk_duration}-{max_chunk_duration}s, "
+              f"silence_timeout={silence_timeout}s")
+    
+    def get_vad_stats(self) -> dict:
+        """Get current VAD statistics"""
+        if self.vad_chunker:
+            return self.vad_chunker.get_stats()
+        return {}
     
     @staticmethod
     def get_available_devices():
