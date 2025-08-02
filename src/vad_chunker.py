@@ -60,6 +60,13 @@ class VADChunker:
         self.last_speech_time = time.time()
         self.chunk_start_time = time.time()
 
+        # Improved chunking state
+        self.consecutive_silence_frames = 0
+        self.silence_threshold_frames = int(silence_timeout * 1000 / frame_duration_ms)
+        self.recent_speech_frames = (
+            []
+        )  # Track recent speech activity for smarter chunking
+
         # Callback for processed chunks
         self.chunk_callback: Optional[Callable[[np.ndarray], None]] = None
 
@@ -108,6 +115,13 @@ class VADChunker:
                         print(f"🎤 Speech detected - starting new chunk")
 
                     self.last_speech_time = time.time()
+                    self.consecutive_silence_frames = 0  # Reset silence counter
+
+                    # Track recent speech activity for better chunking decisions
+                    self.recent_speech_frames.append(True)
+                    if len(self.recent_speech_frames) > 10:  # Keep last 10 frames
+                        self.recent_speech_frames.pop(0)
+
                     # Add corresponding float32 audio to buffer
                     start_sample = i
                     end_sample = i + self.frame_samples
@@ -116,22 +130,33 @@ class VADChunker:
                 else:
                     # No speech in this frame
                     if self.is_speaking:
+                        self.consecutive_silence_frames += 1
+
                         # Add frame to buffer anyway (short silence gaps are normal)
                         start_sample = i
                         end_sample = i + self.frame_samples
                         self.speech_buffer.append(audio_data[start_sample:end_sample])
 
-                        # Check if silence timeout exceeded
+                        # Check if silence timeout exceeded with smarter chunking
                         silence_duration = time.time() - self.last_speech_time
                         chunk_duration = time.time() - self.chunk_start_time
 
+                        # Use frame-based silence detection for more precise timing
+                        silence_frames_exceeded = (
+                            self.consecutive_silence_frames
+                            >= self.silence_threshold_frames
+                        )
+
                         if (
-                            silence_duration >= self.silence_timeout
+                            silence_frames_exceeded
                             and chunk_duration >= self.min_chunk_duration
                         ) or chunk_duration >= self.max_chunk_duration:
 
                             # Trigger chunk processing
                             chunk_triggered = self._trigger_chunk()
+                    else:
+                        # Reset silence counter when not speaking
+                        self.consecutive_silence_frames = 0
 
             frames_processed += 1
 
@@ -160,6 +185,8 @@ class VADChunker:
         # Reset state
         self.is_speaking = False
         self.speech_buffer = []
+        self.consecutive_silence_frames = 0
+        self.recent_speech_frames = []
 
         return True
 

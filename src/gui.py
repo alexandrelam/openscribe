@@ -125,6 +125,28 @@ class SettingsDialog:
         except (ValueError, AttributeError):
             self.model_combo.current(0)  # Default to small
 
+        ttk.Label(main_frame, text="Live Quality Mode:").grid(
+            row=8, column=0, sticky=tk.W, pady=(0, 5)
+        )
+
+        # Live quality mode selection dropdown
+        self.quality_var = tk.StringVar()
+        quality_options = list(Config.get_live_quality_modes().values())
+        quality_codes = list(Config.get_live_quality_modes().keys())
+
+        self.quality_combo = ttk.Combobox(
+            main_frame, textvariable=self.quality_var, state="readonly", width=25
+        )
+        self.quality_combo["values"] = quality_options
+        self.quality_combo.grid(row=8, column=1, sticky=tk.W, pady=(0, 5))
+
+        # Set current quality mode selection
+        try:
+            current_quality_index = quality_codes.index(self.config.live_quality_mode)
+            self.quality_combo.current(current_quality_index)
+        except (ValueError, AttributeError):
+            self.quality_combo.current(1)  # Default to balanced
+
         # Language detection checkbox
         self.language_detection_var = tk.BooleanVar(
             value=getattr(self.config, "language_detection_enabled", True)
@@ -133,15 +155,15 @@ class SettingsDialog:
             main_frame,
             text="Show language detection info",
             variable=self.language_detection_var,
-        ).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(0, 20))
+        ).grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(0, 20))
 
         # VAD settings
         ttk.Label(
             main_frame, text="Voice Activity Detection:", font=("Arial", 12, "bold")
-        ).grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         ttk.Label(main_frame, text="Aggressiveness (0-3):").grid(
-            row=10, column=0, sticky=tk.W, pady=(0, 5)
+            row=11, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_aggressiveness_var = tk.StringVar(
@@ -349,6 +371,12 @@ class SettingsDialog:
             if selected_model_index >= 0:
                 self.config.model_size = model_codes[selected_model_index]
 
+            # Update quality mode config
+            quality_codes = list(Config.get_live_quality_modes().keys())
+            selected_quality_index = self.quality_combo.current()
+            if selected_quality_index >= 0:
+                self.config.live_quality_mode = quality_codes[selected_quality_index]
+
             self.config.language_detection_enabled = self.language_detection_var.get()
 
             # Update VAD config
@@ -393,6 +421,9 @@ class SpeechToTextGUI:
         self.transcription_engine = TranscriptionEngine(
             language_config=self.config.transcription_language,
             model_size=self.config.model_size,
+            live_quality_mode=self.config.live_quality_mode,
+            enable_overlap_detection=self.config.enable_overlap_detection,
+            debug_text_assembly=self.config.debug_text_assembly,
         )
         self.text_inserter = TextInserter()
 
@@ -690,6 +721,9 @@ class SpeechToTextGUI:
                 self.transcription_engine = TranscriptionEngine(
                     language_config=self.config.transcription_language,
                     model_size=self.config.model_size,
+                    live_quality_mode=self.config.live_quality_mode,
+                    enable_overlap_detection=self.config.enable_overlap_detection,
+                    debug_text_assembly=self.config.debug_text_assembly,
                 )
                 self._apply_vad_config()
                 self._apply_paste_config()
@@ -737,6 +771,9 @@ class SpeechToTextGUI:
             self.transcription_engine.configure_language(
                 language_config=self.config.transcription_language,
                 model_size=self.config.model_size,
+                live_quality_mode=self.config.live_quality_mode,
+                enable_overlap_detection=self.config.enable_overlap_detection,
+                debug_text_assembly=self.config.debug_text_assembly,
             )
 
     def _apply_indicator_config(self):

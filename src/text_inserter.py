@@ -183,7 +183,8 @@ class TextInserter:
         cleaned_lines = [" ".join(line.split()) for line in lines]
         cleaned = "\n".join(cleaned_lines)
 
-        return cleaned.strip()
+        # Don't strip leading/trailing spaces as they may be intentional for word boundaries
+        return cleaned
 
     def get_focused_window(self) -> Optional[str]:
         try:
@@ -309,16 +310,12 @@ class TextInserter:
 
     def queue_text_for_live_typing(self, text: str):
         """Queue text for immediate live pasting at cursor position"""
-        text = text.strip()
+        # Don't strip the text as it may have intentional leading spaces for word boundaries
         if not self.live_pasting_active or not text:
             return
 
         with self.paste_lock:
-            # Add space before text if queue is not empty and text doesn't start with punctuation
-            if self.paste_queue and not text.startswith(
-                (" ", ".", ",", "!", "?", ";", ":")
-            ):
-                text = " " + text
+            # The transcription engine should handle spacing, so just queue the text as-is
             self.paste_queue.append(text)
 
         print(f"📝 Queued text for pasting: '{text}'")

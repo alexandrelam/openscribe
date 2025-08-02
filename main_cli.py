@@ -29,6 +29,9 @@ class SpeechToTextCLI:
         self.transcription_engine = TranscriptionEngine(
             language_config=self.config.transcription_language,
             model_size=self.config.model_size,
+            live_quality_mode=self.config.live_quality_mode,
+            enable_overlap_detection=self.config.enable_overlap_detection,
+            debug_text_assembly=self.config.debug_text_assembly,
         )
         self.text_inserter = TextInserter()
         self.double_key_detector = DoubleKeyDetector(double_press_timeout=0.5)
@@ -197,6 +200,9 @@ class SpeechToTextCLI:
             self.transcription_engine.configure_language(
                 language_config=self.config.transcription_language,
                 model_size=self.config.model_size,
+                live_quality_mode=self.config.live_quality_mode,
+                enable_overlap_detection=self.config.enable_overlap_detection,
+                debug_text_assembly=self.config.debug_text_assembly,
             )
 
     def _display_current_settings(self):

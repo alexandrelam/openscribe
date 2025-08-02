@@ -9,17 +9,30 @@ import queue
 
 
 class TranscriptionEngine:
-    def __init__(self, language_config: str = "auto", model_size: str = "small"):
+    def __init__(
+        self,
+        language_config: str = "auto",
+        model_size: str = "small",
+        live_quality_mode: str = "balanced",
+        enable_overlap_detection: bool = True,
+        debug_text_assembly: bool = False,
+    ):
         """
         Initialize Whisper model with configurable language support
 
         Args:
             language_config: "auto" for automatic detection, "en"/"fr"/etc for specific language
             model_size: "small", "base", "large-v3" etc.
+            live_quality_mode: "fast", "balanced", or "accurate" for live transcription
+            enable_overlap_detection: Whether to detect and remove text overlaps in live mode
+            debug_text_assembly: Whether to enable verbose logging for text assembly debugging
         """
         self.language_config = language_config
         self.model_size = model_size
         self.current_model_name = None
+        self.live_quality_mode = live_quality_mode
+        self.enable_overlap_detection = enable_overlap_detection
+        self.debug_text_assembly = debug_text_assembly
 
         # Load appropriate model based on language configuration
         self._load_model()
@@ -42,6 +55,11 @@ class TranscriptionEngine:
         self.pending_chunks = []  # Queue for serialized processing
         self.processing_lock = threading.Lock()  # Ensure one chunk at a time
 
+        # Context preservation for better accuracy
+        self.previous_context = ""  # Store last few words for context
+        self.context_length = 50  # Characters to preserve as context
+        self.overlap_buffer = []  # Overlapping audio for smoother transitions
+
     def _load_model(self):
         """Load appropriate Whisper model based on language configuration"""
         # Determine model name based on language config
@@ -60,12 +78,20 @@ class TranscriptionEngine:
             print(f"✅ Whisper model loaded: {model_name}")
 
     def configure_language(
-        self, language_config: str = "auto", model_size: str = "small"
+        self,
+        language_config: str = "auto",
+        model_size: str = "small",
+        live_quality_mode: str = "balanced",
+        enable_overlap_detection: bool = True,
+        debug_text_assembly: bool = False,
     ):
         """Configure language settings and reload model if necessary"""
         old_language_config = self.language_config
         self.language_config = language_config
         self.model_size = model_size
+        self.live_quality_mode = live_quality_mode
+        self.enable_overlap_detection = enable_overlap_detection
+        self.debug_text_assembly = debug_text_assembly
         self.language_detection_enabled = language_config == "auto"
 
         # Reload model if language configuration changed
@@ -176,6 +202,8 @@ class TranscriptionEngine:
         with self.buffer_lock:
             self.text_buffer = ""
             self.pending_chunks = []
+            self.previous_context = ""
+            self.overlap_buffer = []
 
         # Clear any remaining items in queue
         while not self.transcription_queue.empty():
@@ -217,26 +245,62 @@ class TranscriptionEngine:
     def _transcribe_chunk(
         self, audio_data: np.ndarray, sample_rate: int = 16000
     ) -> Optional[str]:
-        """Transcribe a single audio chunk with optimized settings for speed"""
+        """Transcribe a single audio chunk with context preservation for better accuracy"""
         try:
+            # Add overlapping audio for better context continuity
+            if self.overlap_buffer:
+                # Combine overlap buffer with current chunk
+                overlap_audio = np.concatenate(self.overlap_buffer + [audio_data])
+            else:
+                overlap_audio = audio_data
+
+            # Store last 1 second of current chunk for next overlap
+            overlap_samples = int(sample_rate * 1.0)  # 1 second overlap
+            if len(audio_data) > overlap_samples:
+                self.overlap_buffer = [audio_data[-overlap_samples:]]
+            else:
+                self.overlap_buffer = [audio_data]
+
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                sf.write(temp_file.name, audio_data.flatten(), sample_rate)
+                sf.write(temp_file.name, overlap_audio.flatten(), sample_rate)
                 temp_filename = temp_file.name
 
             try:
-                # Prepare fast transcription parameters
-                transcribe_params = {
-                    "beam_size": 1,  # Faster but potentially less accurate
-                    "best_of": 1,  # Single pass for speed
-                    "temperature": 0.0,  # Deterministic output
-                    "condition_on_previous_text": False,
-                }
+                # Quality-based transcription parameters
+                if self.live_quality_mode == "fast":
+                    transcribe_params = {
+                        "beam_size": 1,  # Fastest
+                        "best_of": 1,
+                        "temperature": 0.0,
+                        "condition_on_previous_text": False,  # Disable for speed
+                        "no_speech_threshold": 0.6,
+                    }
+                elif self.live_quality_mode == "accurate":
+                    transcribe_params = {
+                        "beam_size": 5,  # Most accurate
+                        "best_of": 3,  # Multiple passes
+                        "temperature": 0.0,
+                        "condition_on_previous_text": True,
+                        "no_speech_threshold": 0.4,  # More sensitive
+                    }
+                else:  # balanced (default)
+                    transcribe_params = {
+                        "beam_size": 3,  # Balanced
+                        "best_of": 1,
+                        "temperature": 0.0,
+                        "condition_on_previous_text": True,
+                        "no_speech_threshold": 0.6,
+                    }
+
+                # Add previous context if available
+                if self.previous_context:
+                    transcribe_params["initial_prompt"] = self.previous_context
 
                 # Add language parameter if not auto-detecting
                 if self.language_config != "auto":
                     transcribe_params["language"] = self.language_config
 
-                # Use faster settings for real-time transcription
+                # Use improved settings for real-time transcription
                 segments, info = self.model.transcribe(
                     temp_filename, **transcribe_params
                 )
@@ -251,6 +315,11 @@ class TranscriptionEngine:
                     transcribed_text += segment.text.strip() + " "
 
                 transcribed_text = transcribed_text.strip()
+
+                # Update context for next chunk
+                if transcribed_text:
+                    self._update_context(transcribed_text)
+
                 return transcribed_text if transcribed_text else None
 
             finally:
@@ -261,8 +330,50 @@ class TranscriptionEngine:
             print(f"❌ Chunk transcription error: {e}")
             return None
 
+    def _detect_and_remove_overlap(self, previous_text: str, new_text: str) -> str:
+        """Detect and remove overlapping text between consecutive chunks"""
+        if not previous_text or not new_text:
+            return new_text
+
+        # Normalize and split into words
+        prev_words = previous_text.strip().lower().split()
+        new_words = new_text.strip().split()
+        new_words_lower = [w.lower() for w in new_words]
+
+        # Safety limits to prevent over-removal
+        min_remaining_words = 2  # Always keep at least 2 words
+        max_overlap_percent = 0.7  # Don't remove more than 70% of new text
+        max_overlap_words = min(
+            len(prev_words), int(len(new_words) * max_overlap_percent), 8
+        )
+
+        # Try different overlap lengths (from longest to shortest)
+        for overlap_length in range(max_overlap_words, 0, -1):
+            # Safety check: ensure we keep minimum remaining words
+            if len(new_words) - overlap_length < min_remaining_words:
+                continue
+
+            # Get last N words from previous text
+            prev_suffix = prev_words[-overlap_length:]
+            # Get first N words from new text (case-insensitive)
+            new_prefix = new_words_lower[:overlap_length]
+
+            # Check for exact match
+            if prev_suffix == new_prefix:
+                # Remove overlapped words from new text (preserve original case)
+                remaining_words = new_words[overlap_length:]
+                deduped_text = " ".join(remaining_words)
+                if self.debug_text_assembly:
+                    print(
+                        f"🔄 Detected {overlap_length}-word overlap, removed: '{' '.join(new_words[:overlap_length])}'"
+                    )
+                return deduped_text
+
+        # No overlap detected, return full new text
+        return new_text
+
     def _assemble_text_chunk(self, new_text: str) -> str:
-        """Assemble new text chunk with existing buffer (simplified for VAD-based chunks)"""
+        """Assemble new text chunk with existing buffer, removing overlaps from audio buffering"""
         if not new_text:
             return ""
 
@@ -277,24 +388,69 @@ class TranscriptionEngine:
                 self.text_buffer = cleaned_new
                 return cleaned_new
 
-            # Since VAD provides natural speech boundaries, we can simplify assembly
-            # Just add proper spacing between chunks
-            spaced_text = cleaned_new
+            # Detect and remove text overlap caused by audio buffering (if enabled)
+            if self.enable_overlap_detection:
+                if self.debug_text_assembly:
+                    print(f"🔍 Before overlap detection:")
+                    print(f"   Buffer: '{self.text_buffer[-50:]}'")  # Last 50 chars
+                    print(f"   New: '{cleaned_new}'")
+                deduped_text = self._detect_and_remove_overlap(
+                    self.text_buffer, cleaned_new
+                )
+                if self.debug_text_assembly:
+                    print(f"   After deduplication: '{deduped_text}'")
+            else:
+                deduped_text = cleaned_new
 
-            # Add space if needed between chunks
-            if not self.text_buffer.endswith((" ", ".", ",", "!", "?", ";", ":")):
-                spaced_text = " " + cleaned_new
-            elif (
-                self.text_buffer.endswith((".", "!", "?"))
-                and cleaned_new
-                and cleaned_new[0].islower()
-            ):
-                # Add space after sentence-ending punctuation
-                spaced_text = " " + cleaned_new
+            # If deduplication removed everything, return empty
+            if not deduped_text.strip():
+                return ""
 
-            # Update buffer
-            self.text_buffer += spaced_text
-            return spaced_text
+            # Add proper spacing between chunks
+            # After overlap removal, we almost always need a space between chunks
+            needs_space = False
+
+            if self.text_buffer.endswith(" "):
+                # Buffer already ends with space, no need to add another
+                needs_space = False
+                if self.debug_text_assembly:
+                    print(
+                        f"📝 No space needed (buffer ends with space): '{deduped_text}'"
+                    )
+            elif deduped_text and deduped_text[0] in ".,!?;:":
+                # Don't add space before punctuation
+                needs_space = False
+                if self.debug_text_assembly:
+                    print(
+                        f"📝 No space needed (starts with punctuation): '{deduped_text}'"
+                    )
+            else:
+                # Always add space between chunks to ensure proper word boundaries
+                needs_space = True
+                if self.debug_text_assembly:
+                    print(
+                        f"📝 Space needed for word boundary: '{deduped_text}' -> will add space"
+                    )
+
+            # Update buffer with proper spacing
+            if needs_space:
+                self.text_buffer += " " + deduped_text
+                result_text = " " + deduped_text
+            else:
+                self.text_buffer += deduped_text
+                result_text = deduped_text
+
+            if self.debug_text_assembly:
+                print(f"📋 Final result:")
+                print(
+                    f"   Updated buffer: '{self.text_buffer[-100:]}'"
+                )  # Last 100 chars
+                print(
+                    f"   Returning for paste: '{repr(result_text)}'"
+                )  # Use repr to show spaces clearly
+                print(f"   Result length: {len(result_text)}")
+
+            return result_text
 
     def _preprocess_text(self, text: str) -> str:
         """Clean and preprocess text before deduplication"""
@@ -317,6 +473,31 @@ class TranscriptionEngine:
             cleaned = cleaned.replace(old, new)
 
         return cleaned.strip()
+
+    def _update_context(self, new_text: str):
+        """Update previous context for better transcription continuity"""
+        if new_text:
+            # Combine with existing context
+            combined_context = f"{self.previous_context} {new_text}".strip()
+
+            # Keep only the last N characters as context
+            if len(combined_context) > self.context_length:
+                # Try to cut at word boundary
+                words = combined_context.split()
+                context_words = []
+                char_count = 0
+
+                # Add words from the end until we reach the character limit
+                for word in reversed(words):
+                    if char_count + len(word) + 1 <= self.context_length:
+                        context_words.insert(0, word)
+                        char_count += len(word) + 1
+                    else:
+                        break
+
+                self.previous_context = " ".join(context_words)
+            else:
+                self.previous_context = combined_context
 
     def is_streaming_active(self) -> bool:
         """Check if streaming transcription is active"""

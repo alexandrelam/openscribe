@@ -21,6 +21,11 @@ class Config:
     language_detection_enabled: bool = True  # Show detected language info
     fallback_language: str = "en"  # Fallback when auto-detection fails
 
+    # Live transcription quality configuration
+    live_quality_mode: str = "balanced"  # "fast", "balanced", "accurate"
+    enable_overlap_detection: bool = True  # Enable text overlap detection and removal
+    debug_text_assembly: bool = False  # Enable verbose logging for text assembly
+
     # VAD configuration
     vad_aggressiveness: int = 2  # 0-3, higher = more aggressive
     vad_min_chunk_duration: float = 1.0  # minimum seconds per chunk
@@ -125,6 +130,15 @@ class Config:
             "small": "Small (39M parameters, fast)",
             "base": "Base (74M parameters, balanced)",
             "large-v3": "Large V3 (1550M parameters, most accurate)",
+        }
+
+    @staticmethod
+    def get_live_quality_modes() -> dict:
+        """Get available live transcription quality modes"""
+        return {
+            "fast": "Fast (Low latency, basic accuracy)",
+            "balanced": "Balanced (Good speed and accuracy)",
+            "accurate": "Accurate (Best quality, higher latency)",
         }
 
     def save(self) -> None:
