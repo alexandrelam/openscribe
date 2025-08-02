@@ -147,7 +147,7 @@ class Config:
         """Get available Whisper model providers"""
         return {
             "faster-whisper": "Faster Whisper (Fast, GPU-optimized)",
-            "whisper-cpp": "Whisper.cpp (CPU-optimized, C++ implementation)",
+            "whisper-cpp": "Whisper.cpp (CPU-optimized, CLI-based C++ implementation)",
         }
 
     def save(self) -> None:

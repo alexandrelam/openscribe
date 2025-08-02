@@ -5,7 +5,8 @@ An advanced real-time speech-to-text desktop application with Voice Activity Det
 ## ✨ Features
 
 ### 🎯 Core Capabilities
-✅ **Advanced Voice Recognition**: Offline transcription using faster-whisper models  
+✅ **Multiple Whisper Providers**: Choose between faster-whisper (GPU-optimized) or whisper.cpp (CPU-optimized)  
+✅ **Advanced Voice Recognition**: Offline transcription using state-of-the-art Whisper models  
 ✅ **11+ Language Support**: Auto-detection or specific language selection (English, French, Spanish, German, etc.)  
 ✅ **Voice Activity Detection (VAD)**: Intelligent chunking based on natural speech boundaries  
 ✅ **Real-time Transcription**: Live streaming mode with instant text insertion  
@@ -18,6 +19,7 @@ An advanced real-time speech-to-text desktop application with Voice Activity Det
 ✅ **Global Command Access**: Install once, use `vibe` from anywhere  
 
 ### ⚙️ Advanced Settings
+✅ **Whisper Provider Selection**: Choose between faster-whisper and whisper.cpp in settings  
 ✅ **Comprehensive Configuration**: Language, VAD parameters, paste behavior  
 ✅ **Real-time Language Display**: Shows detected language and confidence  
 ✅ **Multiple Paste Methods**: AppleScript (primary) with keyboard fallback  
@@ -140,23 +142,29 @@ vibe --cli
 
 ```
 speech-to-text/
-├── install.sh            # Global installation script  
-├── uninstall.sh          # Global uninstallation script
-├── main.py               # GUI application entry point
-├── main_cli.py           # CLI version 
-├── test_components.py    # Component testing script
-├── requirements.txt      # Python dependencies
-├── config.json           # User configuration (auto-generated)
+├── install.sh                    # Global installation script  
+├── uninstall.sh                  # Global uninstallation script
+├── download_whisper_models.sh    # Whisper.cpp model download script
+├── main.py                       # GUI application entry point
+├── main_cli.py                   # CLI version 
+├── test_components.py            # Component testing script
+├── requirements.txt              # Python dependencies
+├── config.json                   # User configuration (auto-generated)
 ├── src/
 │   ├── __init__.py
-│   ├── gui.py           # Main tkinter GUI with settings
-│   ├── audio_recorder.py  # VAD-based audio recording  
-│   ├── transcription.py   # Multilingual whisper engine
-│   ├── text_inserter.py   # Clipboard-based text insertion
-│   ├── vad_chunker.py     # Voice Activity Detection
+│   ├── gui.py                   # Main tkinter GUI with settings
+│   ├── audio_recorder.py        # VAD-based audio recording  
+│   ├── transcription.py         # Multilingual whisper engine with provider support
+│   ├── text_inserter.py         # Clipboard-based text insertion
+│   ├── vad_chunker.py           # Voice Activity Detection
 │   ├── double_key_shortcuts.py  # Double key press detection
-│   └── config.py          # Configuration management
-└── venv/                # Virtual environment
+│   ├── config.py                # Configuration management
+│   └── providers/               # Whisper provider implementations
+│       ├── __init__.py          # Provider availability checks
+│       ├── base_provider.py     # Abstract base provider class
+│       ├── faster_whisper_provider.py  # Default GPU-optimized provider
+│       └── whisper_cpp_provider.py     # CPU-optimized CLI provider
+└── venv/                        # Virtual environment
 ```
 
 ## 🔄 Management Commands
@@ -191,7 +199,7 @@ ls -la ~/.local/bin/vibe*
 
 ### Core Dependencies
 - **sounddevice**: High-quality audio recording from microphone
-- **faster-whisper**: Offline speech recognition with multilingual support
+- **faster-whisper**: Offline speech recognition with multilingual support (default provider)
 - **webrtcvad**: Voice Activity Detection for intelligent chunking
 - **pyperclip**: Clipboard operations for text insertion
 - **pynput**: Global hotkey support
@@ -201,6 +209,169 @@ ls -la ~/.local/bin/vibe*
 ### Additional Dependencies  
 - **pyautogui**: Fallback text insertion method
 - **numpy**: Audio data processing
+
+### Optional: Whisper.cpp Provider
+For CPU-optimized transcription using the whisper.cpp implementation:
+
+```bash
+# Install whisper.cpp via Homebrew (macOS)
+brew install whisper-cpp
+
+# Download Whisper models (required for whisper.cpp)
+# See "Whisper.cpp Model Setup" section below
+```
+
+## 🤖 Whisper.cpp Model Setup
+
+The application supports two Whisper providers:
+- **faster-whisper** (default): GPU-optimized, models downloaded automatically
+- **whisper.cpp**: CPU-optimized, requires manual model download
+
+### Installing Whisper.cpp Provider
+
+1. **Install whisper.cpp:**
+   ```bash
+   # macOS (Homebrew)
+   brew install whisper-cpp
+   
+   # Linux (build from source)
+   git clone https://github.com/ggerganov/whisper.cpp.git
+   cd whisper.cpp
+   make
+   ```
+
+2. **Download Whisper Models:**
+   
+   The application will automatically look for models in these locations:
+   - `~/whisper-models/` (recommended)
+   - `/opt/homebrew/share/whisper-cpp/`
+   - `~/.whisper-cpp/models/`
+   
+   **Quick Setup - Automated Model Download:**
+   ```bash
+   # Use the included download script (recommended)
+   ./download_whisper_models.sh
+   
+   # Or download specific models directly
+   ./download_whisper_models.sh small-en base-en
+   
+   # See available models
+   ./download_whisper_models.sh list
+   ```
+   
+   **Manual Download (Alternative):**
+   ```bash
+   # Create models directory
+   mkdir -p ~/whisper-models
+   cd ~/whisper-models
+   
+   # Download English-optimized models (faster)
+   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+   
+   # Download multilingual models (supports all languages)
+   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+   ```
+
+### Available Model Sizes
+
+| Model | File Size | Speed | Accuracy | Languages |
+|-------|-----------|--------|----------|-----------|
+| `ggml-tiny.en.bin` | ~39 MB | Fastest | Basic | English only |
+| `ggml-base.en.bin` | ~148 MB | Fast | Good | English only |
+| `ggml-small.en.bin` | ~488 MB | Medium | Better | English only |
+| `ggml-tiny.bin` | ~39 MB | Fastest | Basic | Multilingual |
+| `ggml-base.bin` | ~148 MB | Fast | Good | Multilingual |
+| `ggml-small.bin` | ~488 MB | Medium | Better | Multilingual |
+| `ggml-medium.bin` | ~1.5 GB | Slow | Great | Multilingual |
+| `ggml-large-v3.bin` | ~3.1 GB | Slowest | Best | Multilingual |
+
+### Model Download Script Usage
+
+The included `download_whisper_models.sh` script simplifies model management:
+
+```bash
+# Interactive mode - shows available models and prompts for selection
+./download_whisper_models.sh
+
+# Download specific models
+./download_whisper_models.sh small-en base-en tiny
+
+# Download all models (~6GB total)
+./download_whisper_models.sh all
+
+# List available models
+./download_whisper_models.sh list
+
+# Show currently downloaded models
+./download_whisper_models.sh status
+
+# Get help
+./download_whisper_models.sh help
+```
+
+**Script Features:**
+- ✅ Interactive model selection with progress bars
+- ✅ Automatic model directory creation (`~/whisper-models`)
+- ✅ Overwrite protection (prompts before replacing existing files)
+- ✅ Download verification and error handling
+- ✅ Compatible with bash 3.2+ (macOS default)
+- ✅ Shows model sizes, speeds, and language support
+
+### Manual Model Download URLs
+
+If you prefer manual download, all models are available from the Hugging Face repository:
+```bash
+# Base URL
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/
+
+# Examples:
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
+```
+
+### Using the Whisper.cpp Provider
+
+1. **In GUI**: Go to Settings → Whisper Provider → Select "Whisper.cpp"
+2. **Automatic Fallback**: If your requested model isn't found, the app automatically falls back to available models
+3. **Model Priority**: The app searches for models in this order:
+   - Exact model requested
+   - Available English models (if language is English)
+   - Available multilingual models
+   - Test model (last resort)
+
+### Troubleshooting Whisper.cpp
+
+**"Whisper-cli command not found":**
+```bash
+# Check if whisper-cli is installed
+which whisper-cli
+
+# macOS: Install via Homebrew
+brew install whisper-cpp
+```
+
+**"No speech detected" with proper audio:**
+```bash
+# Verify model file exists and is valid
+ls -la ~/whisper-models/
+file ~/whisper-models/ggml-small.en.bin
+
+# Test with whisper-cli directly
+echo "test" | whisper-cli -m ~/whisper-models/ggml-small.en.bin
+```
+
+**Model not found errors:**
+```bash
+# Check current models
+ls -la ~/whisper-models/
+
+# Download missing model
+cd ~/whisper-models
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+```
 
 ## 🔒 Privacy & Security
 

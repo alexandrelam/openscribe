@@ -9,5 +9,7 @@ numpy
 black
 
 # Optional: For whisper.cpp provider support
-# Install with: pip install whisper-cpp-python
-# whisper-cpp-python
+# Install whisper.cpp CLI via Homebrew:
+# brew install whisper-cpp
+#
+# This provides the whisper-cli command which is used by the WhisperCppProvider

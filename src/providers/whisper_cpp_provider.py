@@ -5,16 +5,19 @@ from typing import Optional, Callable
 import soundfile as sf
 import threading
 import queue
+import subprocess
+import shutil
+import glob
 
 from .base_provider import BaseWhisperProvider
 
-try:
-    from whisper_cpp import Whisper
 
-    WHISPER_CPP_AVAILABLE = True
-except ImportError:
-    WHISPER_CPP_AVAILABLE = False
-    Whisper = None
+def _check_whisper_cli_available():
+    """Check if whisper-cli command is available"""
+    return shutil.which("whisper-cli") is not None
+
+
+WHISPER_CPP_AVAILABLE = _check_whisper_cli_available()
 
 
 class WhisperCppProvider(BaseWhisperProvider):
@@ -35,8 +38,8 @@ class WhisperCppProvider(BaseWhisperProvider):
     ):
         if not WHISPER_CPP_AVAILABLE:
             raise ImportError(
-                "whisper-cpp-python is not installed. "
-                "Install it with: pip install whisper-cpp-python"
+                "whisper-cli command not found. "
+                "Install whisper.cpp with: brew install whisper-cpp"
             )
 
         self.language_config = language_config
@@ -73,14 +76,20 @@ class WhisperCppProvider(BaseWhisperProvider):
         self.overlap_buffer = []
 
     def _load_model(self):
-        """Load appropriate Whisper model based on language configuration"""
-        # Map model sizes to whisper.cpp model names
+        """Determine appropriate Whisper model path based on language configuration"""
+        # Map model sizes to whisper.cpp model filenames
         model_mapping = {
-            "small": "small",
-            "base": "base",
-            "large-v3": "large",
-            "small.en": "small.en",
-            "base.en": "base.en",
+            "tiny": "ggml-tiny.bin",
+            "base": "ggml-base.bin",
+            "small": "ggml-small.bin",
+            "medium": "ggml-medium.bin",
+            "large": "ggml-large-v1.bin",
+            "large-v2": "ggml-large-v2.bin",
+            "large-v3": "ggml-large-v3.bin",
+            "tiny.en": "ggml-tiny.en.bin",
+            "base.en": "ggml-base.en.bin",
+            "small.en": "ggml-small.en.bin",
+            "medium.en": "ggml-medium.en.bin",
         }
 
         # Determine model name based on language config
@@ -91,19 +100,78 @@ class WhisperCppProvider(BaseWhisperProvider):
             # Use multilingual model for other languages or auto-detection
             model_key = self.model_size
 
-        model_name = model_mapping.get(model_key, "small")
+        model_filename = model_mapping.get(model_key, "ggml-small.bin")
 
-        # Only reload if model has changed
-        if model_name != self.current_model_name:
-            print(f"🔄 Loading Whisper.cpp model: {model_name}")
-            try:
-                # Initialize whisper.cpp model
-                self.model = Whisper.from_pretrained(model_name)
-                self.current_model_name = model_name
-                print(f"✅ Whisper.cpp model loaded: {model_name}")
-            except Exception as e:
-                print(f"❌ Failed to load Whisper.cpp model: {e}")
-                raise
+        # Try common model paths
+        model_paths = [
+            f"~/whisper-models/{model_filename}",  # User downloaded models
+            f"/opt/homebrew/share/whisper-cpp/{model_filename}",
+            f"/opt/homebrew/Cellar/whisper-cpp/*/share/whisper-cpp/{model_filename}",
+            f"/usr/local/share/whisper-cpp/{model_filename}",
+            f"~/.whisper-cpp/models/{model_filename}",
+            f"./models/{model_filename}",
+            model_filename,  # Fallback to just filename (whisper-cli will search)
+        ]
+
+        # Add fallback models if original not found
+        if model_filename != "for-tests-ggml-tiny.bin":
+            # Try other downloaded models as fallbacks
+            fallback_models = [
+                "ggml-small.en.bin",
+                "ggml-base.en.bin", 
+                "ggml-tiny.en.bin",
+                "ggml-small.bin",
+                "ggml-base.bin",
+                "ggml-tiny.bin",
+            ]
+            
+            for fallback in fallback_models:
+                if fallback != model_filename:
+                    model_paths.extend([
+                        f"~/whisper-models/{fallback}",
+                        f"/opt/homebrew/share/whisper-cpp/{fallback}",
+                    ])
+            
+            # Add test model as last resort
+            model_paths.extend(
+                [
+                    "/opt/homebrew/share/whisper-cpp/for-tests-ggml-tiny.bin",
+                    "/opt/homebrew/Cellar/whisper-cpp/*/share/whisper-cpp/for-tests-ggml-tiny.bin",
+                ]
+            )
+
+        # Find first existing model path
+        self.model_path = None
+        for path in model_paths:
+            expanded_path = os.path.expanduser(path)
+            if "*" in expanded_path:
+                # Handle glob patterns
+                matches = glob.glob(expanded_path)
+                if matches:
+                    self.model_path = matches[0]  # Use first match
+                    break
+            elif os.path.exists(expanded_path):
+                self.model_path = expanded_path
+                break
+
+        if not self.model_path:
+            # Use the first path as default (whisper-cli will handle missing models)
+            self.model_path = model_paths[0]
+
+        # Only update if model has changed
+        if model_filename != self.current_model_name:
+            self.current_model_name = model_filename
+            if self.model_path:
+                actual_model = os.path.basename(self.model_path)
+                if actual_model != model_filename:
+                    print(
+                        f"🔄 Requested Whisper.cpp model: {model_filename} (fallback to: {actual_model})"
+                    )
+                else:
+                    print(f"🔄 Using Whisper.cpp model: {model_filename}")
+                print(f"✅ Whisper.cpp model configured: {self.model_path}")
+            else:
+                print(f"⚠️ Whisper.cpp model not found: {model_filename}")
 
     def configure_language(
         self,
@@ -146,43 +214,69 @@ class WhisperCppProvider(BaseWhisperProvider):
                 temp_filename = temp_file.name
 
             try:
-                # Prepare transcription parameters for whisper.cpp
-                transcribe_params = {}
+                # Build whisper-cli command
+                cmd = [
+                    "whisper-cli",
+                    "-m",
+                    self.model_path,
+                    "-f",
+                    temp_filename,
+                    "-np",  # No prints (suppress extra output)
+                    "-nt",  # No timestamps
+                    "-otxt",  # Output as text
+                ]
 
                 # Add language parameter if not auto-detecting
                 if self.language_config != "auto":
-                    transcribe_params["language"] = self.language_config
-
-                # Transcribe using whisper.cpp
-                result = self.model.transcribe(temp_filename, **transcribe_params)
-
-                # Extract text from result
-                if isinstance(result, dict):
-                    transcribed_text = result.get("text", "").strip()
-                    # Try to get language info if available
-                    self.detected_language = result.get(
-                        "language", self.language_config
-                    )
-                    self.language_confidence = result.get("probability", 0.0)
-                elif isinstance(result, str):
-                    transcribed_text = result.strip()
-                    # Set defaults for language info
-                    self.detected_language = (
-                        self.language_config if self.language_config != "auto" else "en"
-                    )
-                    self.language_confidence = 1.0
+                    cmd.extend(["-l", self.language_config])
                 else:
-                    transcribed_text = str(result).strip()
-                    self.detected_language = (
-                        self.language_config if self.language_config != "auto" else "en"
-                    )
-                    self.language_confidence = 1.0
+                    cmd.extend(["-l", "auto"])
+
+                # Run whisper-cli
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,  # 30 second timeout
+                )
+
+                if result.returncode != 0:
+                    print(f"❌ Whisper-cli failed with return code {result.returncode}")
+                    if result.stderr:
+                        print(f"❌ Error: {result.stderr.strip()}")
+                    return None
+
+                # Parse output - whisper-cli outputs the transcription to stdout
+                transcribed_text = result.stdout.strip()
+
+                # Extract language info from stderr if available
+                self.detected_language = (
+                    self.language_config if self.language_config != "auto" else "en"
+                )
+                self.language_confidence = 1.0
+
+                # Try to extract language from stderr output
+                if result.stderr:
+                    stderr_lines = result.stderr.strip().split("\n")
+                    for line in stderr_lines:
+                        if "language:" in line.lower() or "detected" in line.lower():
+                            # Try to extract language information
+                            words = line.split()
+                            for i, word in enumerate(words):
+                                if word.lower() in [
+                                    "language:",
+                                    "detected",
+                                ] and i + 1 < len(words):
+                                    potential_lang = words[i + 1].strip("(),").lower()
+                                    if (
+                                        len(potential_lang) == 2
+                                    ):  # Language codes are 2 letters
+                                        self.detected_language = potential_lang
+                                        break
 
                 # Log language information
                 if self.language_detection_enabled:
-                    print(
-                        f"🌍 Detected language: {self.detected_language} (confidence: {self.language_confidence:.2f})"
-                    )
+                    print(f"🌍 Using language: {self.detected_language}")
                 else:
                     print(f"🌍 Using configured language: {self.language_config}")
 
@@ -197,6 +291,9 @@ class WhisperCppProvider(BaseWhisperProvider):
                 if os.path.exists(temp_filename):
                     os.unlink(temp_filename)
 
+        except subprocess.TimeoutExpired:
+            print("❌ Transcription timeout")
+            return None
         except Exception as e:
             print(f"❌ Transcription error: {e}")
             return None
@@ -295,32 +392,73 @@ class WhisperCppProvider(BaseWhisperProvider):
                 temp_filename = temp_file.name
 
             try:
-                # Prepare transcription parameters based on quality mode
-                transcribe_params = {}
+                # Build whisper-cli command with streaming-optimized parameters
+                cmd = [
+                    "whisper-cli",
+                    "-m",
+                    self.model_path,
+                    "-f",
+                    temp_filename,
+                    "-np",  # No prints (suppress extra output)
+                    "-nt",  # No timestamps
+                    "-otxt",  # Output as text
+                ]
 
                 # Add language parameter if not auto-detecting
                 if self.language_config != "auto":
-                    transcribe_params["language"] = self.language_config
-
-                # Note: whisper.cpp may have different parameter names than faster-whisper
-                # These parameters might need adjustment based on the actual whisper-cpp-python API
-
-                # Transcribe using whisper.cpp
-                result = self.model.transcribe(temp_filename, **transcribe_params)
-
-                # Extract text from result
-                if isinstance(result, dict):
-                    transcribed_text = result.get("text", "").strip()
-                    self.detected_language = result.get(
-                        "language", self.detected_language
-                    )
-                    self.language_confidence = result.get(
-                        "probability", self.language_confidence
-                    )
-                elif isinstance(result, str):
-                    transcribed_text = result.strip()
+                    cmd.extend(["-l", self.language_config])
                 else:
-                    transcribed_text = str(result).strip()
+                    cmd.extend(["-l", "auto"])
+
+                # Add quality-based parameters
+                if self.live_quality_mode == "fast":
+                    cmd.extend(
+                        [
+                            "-bs",
+                            "1",  # Beam size 1 for speed
+                            "-bo",
+                            "1",  # Best of 1
+                        ]
+                    )
+                elif self.live_quality_mode == "accurate":
+                    cmd.extend(
+                        [
+                            "-bs",
+                            "5",  # Beam size 5 for accuracy
+                            "-bo",
+                            "3",  # Best of 3
+                        ]
+                    )
+                else:  # balanced (default)
+                    cmd.extend(
+                        [
+                            "-bs",
+                            "3",  # Beam size 3 for balance
+                            "-bo",
+                            "1",  # Best of 1
+                        ]
+                    )
+
+                # Add context prompt if available
+                if self.previous_context:
+                    cmd.extend(
+                        ["--prompt", self.previous_context[-200:]]
+                    )  # Last 200 chars
+
+                # Run whisper-cli with shorter timeout for streaming
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,  # Shorter timeout for streaming chunks
+                )
+
+                if result.returncode != 0:
+                    # Don't print errors for streaming chunks as they're frequent
+                    return None
+
+                # Parse output
+                transcribed_text = result.stdout.strip()
 
                 # Update context for next chunk
                 if transcribed_text:
@@ -332,6 +470,9 @@ class WhisperCppProvider(BaseWhisperProvider):
                 if os.path.exists(temp_filename):
                     os.unlink(temp_filename)
 
+        except subprocess.TimeoutExpired:
+            # Timeout is expected for streaming, don't log as error
+            return None
         except Exception as e:
             print(f"❌ Chunk transcription error: {e}")
             return None
@@ -510,8 +651,8 @@ class WhisperCppProvider(BaseWhisperProvider):
     def provider_info(self) -> dict:
         """Return information about this provider"""
         return {
-            "name": "Whisper.cpp",
-            "description": "CPU-optimized C++ implementation of Whisper",
+            "name": "Whisper.cpp CLI",
+            "description": "CPU-optimized C++ implementation via CLI (whisper-cli)",
             "current_model": self.current_model_name,
             "language_config": self.language_config,
             "model_size": self.model_size,

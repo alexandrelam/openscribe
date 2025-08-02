@@ -37,14 +37,14 @@ def test_provider_availability():
             from src.providers import WhisperCppProvider
 
             if WHISPER_CPP_AVAILABLE:
-                print("✅ WhisperCppProvider available and can be imported")
+                print("✅ WhisperCppProvider available - whisper-cli command found")
             else:
                 print(
-                    "⚠️ WhisperCppProvider import successful but whisper-cpp-python not available"
+                    "⚠️ WhisperCppProvider import successful but whisper-cli command not available"
                 )
         except ImportError as e:
             print(
-                f"⚠️ WhisperCppProvider import failed (expected if whisper-cpp-python not installed): {e}"
+                f"⚠️ WhisperCppProvider import failed (expected if whisper-cli not installed): {e}"
             )
 
         # Test TranscriptionEngine
@@ -70,7 +70,7 @@ def test_provider_availability():
             print(f"   Provider info: {engine_cpp.provider_info}")
         except Exception as e:
             print(
-                f"⚠️ TranscriptionEngine with whisper-cpp failed (expected if not installed): {e}"
+                f"⚠️ TranscriptionEngine with whisper-cpp failed (expected if whisper-cli not available): {e}"
             )
 
         # Test Config providers
