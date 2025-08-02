@@ -125,8 +125,30 @@ class SettingsDialog:
         except (ValueError, AttributeError):
             self.model_combo.current(0)  # Default to small
 
-        ttk.Label(main_frame, text="Live Quality Mode:").grid(
+        ttk.Label(main_frame, text="Whisper Provider:").grid(
             row=8, column=0, sticky=tk.W, pady=(0, 5)
+        )
+
+        # Whisper provider selection dropdown
+        self.provider_var = tk.StringVar()
+        provider_options = list(Config.get_available_providers().values())
+        provider_codes = list(Config.get_available_providers().keys())
+
+        self.provider_combo = ttk.Combobox(
+            main_frame, textvariable=self.provider_var, state="readonly", width=25
+        )
+        self.provider_combo["values"] = provider_options
+        self.provider_combo.grid(row=8, column=1, sticky=tk.W, pady=(0, 5))
+
+        # Set current provider selection
+        try:
+            current_provider_index = provider_codes.index(self.config.whisper_provider)
+            self.provider_combo.current(current_provider_index)
+        except (ValueError, AttributeError):
+            self.provider_combo.current(0)  # Default to faster-whisper
+
+        ttk.Label(main_frame, text="Live Quality Mode:").grid(
+            row=9, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         # Live quality mode selection dropdown
@@ -138,7 +160,7 @@ class SettingsDialog:
             main_frame, textvariable=self.quality_var, state="readonly", width=25
         )
         self.quality_combo["values"] = quality_options
-        self.quality_combo.grid(row=8, column=1, sticky=tk.W, pady=(0, 5))
+        self.quality_combo.grid(row=9, column=1, sticky=tk.W, pady=(0, 5))
 
         # Set current quality mode selection
         try:
@@ -155,15 +177,15 @@ class SettingsDialog:
             main_frame,
             text="Show language detection info",
             variable=self.language_detection_var,
-        ).grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(0, 20))
+        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 20))
 
         # VAD settings
         ttk.Label(
             main_frame, text="Voice Activity Detection:", font=("Arial", 12, "bold")
-        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=11, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         ttk.Label(main_frame, text="Aggressiveness (0-3):").grid(
-            row=11, column=0, sticky=tk.W, pady=(0, 5)
+            row=12, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_aggressiveness_var = tk.StringVar(
@@ -176,7 +198,7 @@ class SettingsDialog:
             textvariable=self.vad_aggressiveness_var,
             width=10,
         )
-        aggressiveness_spinbox.grid(row=10, column=1, sticky=tk.W, pady=(0, 5))
+        aggressiveness_spinbox.grid(row=12, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Min chunk duration (s):").grid(
             row=11, column=0, sticky=tk.W, pady=(0, 5)
@@ -193,7 +215,7 @@ class SettingsDialog:
             textvariable=self.vad_min_duration_var,
             width=10,
         )
-        min_duration_spinbox.grid(row=11, column=1, sticky=tk.W, pady=(0, 5))
+        min_duration_spinbox.grid(row=13, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Max chunk duration (s):").grid(
             row=12, column=0, sticky=tk.W, pady=(0, 5)
@@ -210,7 +232,7 @@ class SettingsDialog:
             textvariable=self.vad_max_duration_var,
             width=10,
         )
-        max_duration_spinbox.grid(row=12, column=1, sticky=tk.W, pady=(0, 5))
+        max_duration_spinbox.grid(row=14, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Silence timeout (s):").grid(
             row=13, column=0, sticky=tk.W, pady=(0, 5)
@@ -227,12 +249,12 @@ class SettingsDialog:
             textvariable=self.vad_silence_timeout_var,
             width=10,
         )
-        silence_timeout_spinbox.grid(row=13, column=1, sticky=tk.W, pady=(0, 20))
+        silence_timeout_spinbox.grid(row=15, column=1, sticky=tk.W, pady=(0, 20))
 
         # Recording Indicator settings
         ttk.Label(
             main_frame, text="Recording Indicator:", font=("Arial", 12, "bold")
-        ).grid(row=14, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=16, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         self.show_indicator_var = tk.BooleanVar(
             value=self.config.show_recording_indicator
@@ -241,14 +263,14 @@ class SettingsDialog:
             main_frame,
             text="Show fixed position recording indicator",
             variable=self.show_indicator_var,
-        ).grid(row=15, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=17, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         ttk.Label(main_frame, text="Screen position (X, Y):").grid(
             row=16, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         position_frame = ttk.Frame(main_frame)
-        position_frame.grid(row=16, column=1, sticky=tk.W, pady=(0, 5))
+        position_frame.grid(row=18, column=1, sticky=tk.W, pady=(0, 5))
 
         self.indicator_position_x_var = tk.StringVar(
             value=str(self.config.indicator_position_x)
@@ -282,7 +304,7 @@ class SettingsDialog:
         size_spinbox = ttk.Spinbox(
             main_frame, from_=10, to=50, textvariable=self.indicator_size_var, width=10
         )
-        size_spinbox.grid(row=17, column=1, sticky=tk.W, pady=(0, 5))
+        size_spinbox.grid(row=19, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Opacity (0.1-1.0):").grid(
             row=18, column=0, sticky=tk.W, pady=(0, 5)
@@ -299,11 +321,11 @@ class SettingsDialog:
             textvariable=self.indicator_opacity_var,
             width=10,
         )
-        opacity_spinbox.grid(row=18, column=1, sticky=tk.W, pady=(0, 20))
+        opacity_spinbox.grid(row=20, column=1, sticky=tk.W, pady=(0, 20))
 
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=19, column=0, columnspan=2, pady=(20, 0))
+        button_frame.grid(row=21, column=0, columnspan=2, pady=(20, 0))
 
         ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(
             side=tk.RIGHT, padx=(10, 0)
@@ -371,6 +393,12 @@ class SettingsDialog:
             if selected_model_index >= 0:
                 self.config.model_size = model_codes[selected_model_index]
 
+            # Update provider config
+            provider_codes = list(Config.get_available_providers().keys())
+            selected_provider_index = self.provider_combo.current()
+            if selected_provider_index >= 0:
+                self.config.whisper_provider = provider_codes[selected_provider_index]
+
             # Update quality mode config
             quality_codes = list(Config.get_live_quality_modes().keys())
             selected_quality_index = self.quality_combo.current()
@@ -424,6 +452,7 @@ class SpeechToTextGUI:
             live_quality_mode=self.config.live_quality_mode,
             enable_overlap_detection=self.config.enable_overlap_detection,
             debug_text_assembly=self.config.debug_text_assembly,
+            whisper_provider=self.config.whisper_provider,
         )
         self.text_inserter = TextInserter()
 
@@ -728,6 +757,7 @@ class SpeechToTextGUI:
                     live_quality_mode=self.config.live_quality_mode,
                     enable_overlap_detection=self.config.enable_overlap_detection,
                     debug_text_assembly=self.config.debug_text_assembly,
+                    whisper_provider=self.config.whisper_provider,
                 )
                 self._apply_vad_config()
                 self._apply_paste_config()

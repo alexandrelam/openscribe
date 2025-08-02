@@ -7,3 +7,7 @@ pyperclip
 webrtcvad
 numpy
 black
+
+# Optional: For whisper.cpp provider support
+# Install with: pip install whisper-cpp-python
+# whisper-cpp-python

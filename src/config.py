@@ -18,6 +18,7 @@ class Config:
     # Language and transcription configuration
     transcription_language: str = "auto"  # "auto", "en", "fr", etc.
     model_size: str = "small"  # "small", "base", "large-v3"
+    whisper_provider: str = "faster-whisper"  # "faster-whisper", "whisper-cpp"
     language_detection_enabled: bool = True  # Show detected language info
     fallback_language: str = "en"  # Fallback when auto-detection fails
 
@@ -139,6 +140,14 @@ class Config:
             "fast": "Fast (Low latency, basic accuracy)",
             "balanced": "Balanced (Good speed and accuracy)",
             "accurate": "Accurate (Best quality, higher latency)",
+        }
+
+    @staticmethod
+    def get_available_providers() -> dict:
+        """Get available Whisper model providers"""
+        return {
+            "faster-whisper": "Faster Whisper (Fast, GPU-optimized)",
+            "whisper-cpp": "Whisper.cpp (CPU-optimized, C++ implementation)",
         }
 
     def save(self) -> None:

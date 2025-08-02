@@ -32,6 +32,7 @@ class SpeechToTextCLI:
             live_quality_mode=self.config.live_quality_mode,
             enable_overlap_detection=self.config.enable_overlap_detection,
             debug_text_assembly=self.config.debug_text_assembly,
+            whisper_provider=self.config.whisper_provider,
         )
         self.text_inserter = TextInserter()
         self.double_key_detector = DoubleKeyDetector(double_press_timeout=0.5)
@@ -52,6 +53,9 @@ class SpeechToTextCLI:
         self._apply_vad_config()
         self._apply_paste_config()
         self._apply_language_config()
+
+        # Show provider information on startup
+        self._show_provider_info()
 
     def _print_status(self, message: str):
         """Print status message with current state"""
@@ -204,6 +208,20 @@ class SpeechToTextCLI:
                 enable_overlap_detection=self.config.enable_overlap_detection,
                 debug_text_assembly=self.config.debug_text_assembly,
             )
+
+    def _show_provider_info(self):
+        """Show current Whisper provider information on startup"""
+        provider_info = self.transcription_engine.provider_info
+        language_info = self.transcription_engine.get_language_info()
+
+        print("\n🔧 Speech-to-Text Configuration:")
+        print("-" * 40)
+        print(f"🤖 Whisper Provider: {provider_info['name']}")
+        print(f"📝 Description: {provider_info['description']}")
+        print(f"🧠 Model: {provider_info['current_model']}")
+        print(f"🌍 Language: {language_info['configured_language']}")
+        print(f"⚡ Quality Mode: {provider_info['live_quality_mode']}")
+        print("-" * 40)
 
     def _display_current_settings(self):
         """Display current configuration settings"""
