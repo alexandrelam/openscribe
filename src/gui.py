@@ -527,9 +527,13 @@ class SpeechToTextGUI:
                 keyboard.HotKey.parse("<cmd>+<shift>+r"), on_hotkey
             )
 
-            def for_canonical(f):
-                return lambda k: f(listener.canonical(k))
+            # Create listener first
+            self.hotkey_listener = keyboard.Listener()
 
+            def for_canonical(f):
+                return lambda k: f(self.hotkey_listener.canonical(k))
+
+            # Now recreate with proper callbacks
             self.hotkey_listener = keyboard.Listener(
                 on_press=for_canonical(hotkey.press),
                 on_release=for_canonical(hotkey.release),
