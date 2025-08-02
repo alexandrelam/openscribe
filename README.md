@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- Logo placeholder - Replace with actual logo -->
-<img src="https://via.placeholder.com/200x200/4A90E2/FFFFFF?text=OpenScribe" alt="OpenScribe Logo" width="200"/>
+<img src="https://github.com/user-attachments/assets/877ec94a-782c-4156-b4e4-49885bd010e3" alt="OpenScribe Logo" width="200"/>
 
 # OpenScribe
 
