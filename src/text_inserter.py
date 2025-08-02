@@ -63,8 +63,11 @@ class TextInserter:
             # Use clipboard-safe pasting
             return self._paste_text_safely(cleaned_text)
 
-        except Exception as e:
+        except (OSError, IOError, pyperclip.PyperclipException) as e:
             print(f"Failed to insert text: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected error inserting text: {e}")
             return False
 
     def copy_to_clipboard(self, text: str) -> bool:
@@ -72,8 +75,11 @@ class TextInserter:
         try:
             pyperclip.copy(text)
             return True
-        except Exception as e:
+        except pyperclip.PyperclipException as e:
             print(f"Failed to copy to clipboard: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected clipboard error: {e}")
             return False
 
     def _backup_clipboard(self) -> bool:
@@ -81,8 +87,12 @@ class TextInserter:
         try:
             self._original_clipboard = pyperclip.paste()
             return True
-        except Exception as e:
+        except pyperclip.PyperclipException as e:
             print(f"Failed to backup clipboard: {e}")
+            self._original_clipboard = None
+            return False
+        except Exception as e:
+            print(f"Unexpected error backing up clipboard: {e}")
             self._original_clipboard = None
             return False
 
@@ -116,8 +126,18 @@ class TextInserter:
 
             return success
 
-        except Exception as e:
+        except (
+            OSError,
+            IOError,
+            pyperclip.PyperclipException,
+            pyautogui.FailSafeException,
+        ) as e:
             print(f"Failed to paste text safely: {e}")
+            # Try to restore clipboard even if paste failed
+            self._restore_clipboard()
+            return False
+        except Exception as e:
+            print(f"Unexpected error in safe paste: {e}")
             # Try to restore clipboard even if paste failed
             self._restore_clipboard()
             return False
@@ -144,8 +164,11 @@ class TextInserter:
                 pyautogui.hotkey("cmd", "v")
                 return True
 
-        except Exception as e:
+        except (OSError, pyautogui.FailSafeException) as e:
             print(f"Paste operation failed: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected paste error: {e}")
             return False
 
     def _paste_with_applescript(self) -> bool:
@@ -166,8 +189,11 @@ class TextInserter:
 
             return result.returncode == 0
 
-        except Exception as e:
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError) as e:
             print(f"AppleScript paste failed: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected AppleScript error: {e}")
             return False
 
     def _clean_text_for_pasting(self, text: str) -> str:

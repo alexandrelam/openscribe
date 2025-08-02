@@ -75,6 +75,17 @@ class WhisperCppProvider(BaseWhisperProvider):
         self.context_length = 50
         self.overlap_buffer = []
 
+    def _validate_model_filename(self, filename: str) -> bool:
+        """Validate model filename to prevent injection attacks"""
+        import re
+        # Only allow alphanumeric, dots, hyphens, underscores
+        if not re.match(r'^[a-zA-Z0-9._-]+\.bin$', filename):
+            return False
+        # Prevent directory traversal
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return False
+        return True
+
     def _load_model(self):
         """Determine appropriate Whisper model path based on language configuration"""
         # Map model sizes to whisper.cpp model filenames
@@ -101,6 +112,10 @@ class WhisperCppProvider(BaseWhisperProvider):
             model_key = self.model_size
 
         model_filename = model_mapping.get(model_key, "ggml-small.bin")
+        
+        # Validate model filename for security
+        if not self._validate_model_filename(model_filename):
+            raise ValueError(f"Invalid model filename: {model_filename}")
 
         # Try common model paths
         model_paths = [
@@ -140,18 +155,28 @@ class WhisperCppProvider(BaseWhisperProvider):
                 ]
             )
 
-        # Find first existing model path
+        # Find first existing model path with validation
         self.model_path = None
         for path in model_paths:
             expanded_path = os.path.expanduser(path)
+            # Validate path doesn't contain dangerous characters
+            if any(char in expanded_path for char in ['|', '&', ';', '`', '$']):
+                continue
+            
             if "*" in expanded_path:
-                # Handle glob patterns
-                matches = glob.glob(expanded_path)
-                if matches:
-                    self.model_path = matches[0]  # Use first match
-                    break
+                # Handle glob patterns safely
+                try:
+                    matches = glob.glob(expanded_path)
+                    if matches:
+                        # Validate the matched path
+                        candidate = os.path.abspath(matches[0])
+                        if os.path.exists(candidate):
+                            self.model_path = candidate
+                            break
+                except (OSError, ValueError):
+                    continue
             elif os.path.exists(expanded_path):
-                self.model_path = expanded_path
+                self.model_path = os.path.abspath(expanded_path)
                 break
 
         if not self.model_path:
@@ -214,20 +239,30 @@ class WhisperCppProvider(BaseWhisperProvider):
                 temp_filename = temp_file.name
 
             try:
-                # Build whisper-cli command
+                # Build whisper-cli command with validation
+                if not self.model_path or not os.path.exists(self.model_path):
+                    raise ValueError(f"Model path not found or invalid: {self.model_path}")
+                
+                # Validate temp filename
+                if not os.path.exists(temp_filename) or not temp_filename.endswith('.wav'):
+                    raise ValueError(f"Invalid temp file: {temp_filename}")
+                
                 cmd = [
                     "whisper-cli",
                     "-m",
-                    self.model_path,
+                    os.path.abspath(self.model_path),  # Use absolute path
                     "-f",
-                    temp_filename,
+                    os.path.abspath(temp_filename),    # Use absolute path
                     "-np",  # No prints (suppress extra output)
                     "-nt",  # No timestamps
                     "-otxt",  # Output as text
                 ]
 
-                # Add language parameter if not auto-detecting
+                # Add language parameter if not auto-detecting (with validation)
                 if self.language_config != "auto":
+                    # Validate language code (2-3 letter codes only)
+                    if not self.language_config.isalpha() or len(self.language_config) > 3:
+                        raise ValueError(f"Invalid language config: {self.language_config}")
                     cmd.extend(["-l", self.language_config])
                 else:
                     cmd.extend(["-l", "auto"])

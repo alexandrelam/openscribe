@@ -57,18 +57,67 @@ class Config:
     CONFIG_FILE = "config.json"
 
     @classmethod
+    def _validate_config_data(cls, data: dict) -> dict:
+        """Validate and sanitize configuration data"""
+        validated = {}
+
+        # Define validation rules for each field
+        validators = {
+            "microphone_device": lambda x: x is None
+            or (isinstance(x, int) and x >= -1),
+            "hotkey": lambda x: isinstance(x, str)
+            and len(x) <= 50
+            and all(c.isalnum() or c in "+-_" for c in x),
+            "transcription_language": lambda x: isinstance(x, str)
+            and (len(x) <= 10 and (x.isalpha() or x == "auto")),
+            "model_size": lambda x: isinstance(x, str)
+            and x
+            in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"],
+            "vad_aggressiveness": lambda x: isinstance(x, int) and 0 <= x <= 3,
+            "vad_min_chunk_duration": lambda x: isinstance(x, (int, float))
+            and 0.1 <= x <= 10.0,
+            "vad_max_chunk_duration": lambda x: isinstance(x, (int, float))
+            and 1.0 <= x <= 30.0,
+            "paste_method": lambda x: isinstance(x, str)
+            and x in ["applescript", "keyboard"],
+            "whisper_provider": lambda x: isinstance(x, str)
+            and x in ["faster-whisper", "whisper-cpp"],
+        }
+
+        for key, value in data.items():
+            # Only validate keys we have validators for
+            if key in validators:
+                try:
+                    if validators[key](value):
+                        validated[key] = value
+                    else:
+                        print(f"⚠️ Invalid config value for {key}: {value} (skipping)")
+                except Exception:
+                    print(f"⚠️ Error validating config key {key} (skipping)")
+            else:
+                # For keys without validators, pass through (backward compatibility)
+                validated[key] = value
+
+        return validated
+
+    @classmethod
     def load(cls) -> "Config":
         if os.path.exists(cls.CONFIG_FILE):
             try:
                 with open(cls.CONFIG_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
+                # Validate configuration data
+                validated_data = cls._validate_config_data(data)
+
                 # Handle legacy config migration
-                config = cls(**data)
+                config = cls(**validated_data)
                 config._migrate_legacy_settings()
                 return config
+            except (json.JSONDecodeError, FileNotFoundError) as e:
+                print(f"Failed to load config (JSON error): {e}. Using defaults.")
             except Exception as e:
-                print(f"Failed to load config: {e}. Using defaults.")
+                print(f"Unexpected error loading config: {e}. Using defaults.")
         return cls()
 
     def _migrate_legacy_settings(self):
