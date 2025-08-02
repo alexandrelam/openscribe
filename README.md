@@ -1,30 +1,105 @@
-# Vibe Speech-to-Text
+<div align="center">
 
-An advanced real-time speech-to-text desktop application with Voice Activity Detection, multilingual support, and intelligent clipboard-based text insertion.
+<!-- Logo placeholder - Replace with actual logo -->
+<img src="https://via.placeholder.com/200x200/4A90E2/FFFFFF?text=OpenScribe" alt="OpenScribe Logo" width="200"/>
 
-## ✨ Features
+# OpenScribe
 
-### 🎯 Core Capabilities
-✅ **Multiple Whisper Providers**: Choose between faster-whisper (GPU-optimized) or whisper.cpp (CPU-optimized)  
-✅ **Advanced Voice Recognition**: Offline transcription using state-of-the-art Whisper models  
-✅ **11+ Language Support**: Auto-detection or specific language selection (English, French, Spanish, German, etc.)  
-✅ **Voice Activity Detection (VAD)**: Intelligent chunking based on natural speech boundaries  
-✅ **Real-time Transcription**: Live streaming mode with instant text insertion  
-✅ **Smart Text Insertion**: Clipboard-based pasting with backup/restore functionality  
+**The Free, Private, Universal Speech-to-Text App for macOS**
 
-### 🚀 Performance Features
-✅ **60-80% Performance Improvement**: VAD skips silence automatically  
-✅ **Natural Speech Boundaries**: No mid-word cuts or awkward breaks  
-✅ **Configurable Models**: Choose between speed (small) and accuracy (large-v3)  
-✅ **Global Command Access**: Install once, use `vibe` from anywhere  
+*Transform your voice into text instantly, anywhere, without compromising your privacy*
 
-### ⚙️ Advanced Settings
-✅ **Whisper Provider Selection**: Choose between faster-whisper and whisper.cpp in settings  
-✅ **Comprehensive Configuration**: Language, VAD parameters, paste behavior  
-✅ **Real-time Language Display**: Shows detected language and confidence  
-✅ **Multiple Paste Methods**: AppleScript (primary) with keyboard fallback  
-✅ **Double Key Press Shortcuts**: Quick mode activation with double Shift/Control  
-✅ **International Keyboard Support**: Proper handling of French AZERTY, etc.  
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
+
+---
+
+### 🎥 See OpenScribe in Action
+
+<!-- Video demo placeholder - Replace with actual demo video -->
+<a href="https://github.com/alexandrelam/openscribe">
+  <img src="https://via.placeholder.com/800x450/FF6B6B/FFFFFF?text=📹+Demo+Video+Coming+Soon" alt="OpenScribe Demo Video" width="800"/>
+</a>
+
+*Click to watch how OpenScribe works across any macOS application*
+
+</div>
+
+## 🚀 Why Choose OpenScribe?
+
+**Fed up with expensive speech-to-text subscriptions?** OpenScribe is the **100% free, open-source alternative** to paid apps like Whisper Transcribe and Ink Voice.
+
+### ✨ **Completely Free Forever**
+- No subscriptions, no usage limits, no hidden costs
+- Full-featured app with professional-grade accuracy
+- Open source - modify and customize as you wish
+
+### 🔒 **Your Privacy Guaranteed** 
+- **100% offline processing** - your voice never leaves your Mac
+- No internet required, no data sent to servers
+- Unlike cloud-based services, your conversations stay private
+
+### 🌍 **Works Everywhere**
+- **Universal compatibility** - works in any macOS application
+- One hotkey activation across all your apps
+- No need for app-specific integrations or plugins
+
+### ⚡ **Blazing Fast & Accurate**
+- Real-time transcription with industry-leading Whisper AI
+- 11+ languages with auto-detection
+- Smart voice detection skips silence for 60-80% performance boost
+
+## ⚡ Quick Start - Get Running in 2 Minutes
+
+### 🖥️ One-Command Installation
+
+```bash
+# Clone and install globally
+git clone git@github.com:alexandrelam/openscribe.git
+cd openscribe
+./install.sh
+```
+
+### 🎤 Start Using Immediately
+
+```bash
+# Launch the app from anywhere
+openscribe
+
+# Or use CLI mode
+openscribe --cli
+```
+
+**That's it!** Hit `Cmd+Shift+R` to start recording, or double-tap `Shift` for quick access.
+
+---
+
+## 🌟 Powerful Features That Set Us Apart
+
+### 🎯 **Smart Recording Modes**
+- **Traditional Mode**: Record → Transcribe → Click to paste anywhere
+- **Live Streaming**: Speak continuously, text appears in real-time
+- **Voice Activity Detection**: Automatically starts/stops with your speech
+- **Double-Key Shortcuts**: Double-tap Shift (record) or Control (live mode)
+
+### 🌍 **Universal Language Support**
+- **11+ Languages**: English, French, Spanish, German, Italian, Portuguese, and more
+- **Auto-Detection**: Automatically detects what language you're speaking
+- **Mixed Conversations**: Seamlessly handles switching between languages
+- **Accent Friendly**: Trained on diverse voice patterns and accents
+
+### 🔧 **Professional Customization**
+- **Multiple AI Models**: Choose between speed (small) and accuracy (large-v3)
+- **GPU + CPU Optimized**: Faster-whisper (GPU) or whisper.cpp (CPU) engines
+- **Smart Chunking**: Natural speech boundaries prevent mid-word cuts
+- **Configurable Hotkeys**: Set your preferred keyboard shortcuts
+
+### 🎨 **Seamless Integration**
+- **Works Everywhere**: Slack, Email, Notion, Terminal, any macOS app
+- **Intelligent Pasting**: Preserves your clipboard, restores after pasting
+- **Background Operation**: Minimal system resources, runs quietly
+- **International Keyboards**: Full support for AZERTY, QWERTZ, and more  
 
 ## 🚀 Quick Start
 
