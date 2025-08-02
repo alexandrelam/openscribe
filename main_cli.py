@@ -143,19 +143,16 @@ class SpeechToTextCLI:
                 self.sound_notifications.play_transcription_ready()
                 self._print_status(f"✅ Transcribed: '{self.last_transcribed_text}'")
 
-                # Start auto-insert mode for click-to-paste
-                success = self.text_inserter.start_auto_insert_mode(
-                    self.last_transcribed_text,
-                    timeout_seconds=30,  # 30 second timeout
-                    on_complete=self._on_paste_complete,
-                )
+                # Auto-paste text immediately in CLI mode
+                success = self.text_inserter.insert_text(self.last_transcribed_text)
 
                 if success:
-                    self._set_state(RecordingState.READY_TO_PASTE)
-                    self._print_status("Click anywhere to paste text (30s timeout)")
+                    self._print_status("✅ Text pasted automatically!")
                 else:
-                    self._print_status("❌ Failed to prepare text for pasting")
-                    self._set_state(RecordingState.IDLE)
+                    self._print_status("❌ Failed to paste text")
+
+                self._set_state(RecordingState.IDLE)
+                self._print_status("Ready - Double-press Shift to start recording")
             else:
                 self._print_status("❌ No speech detected or transcription failed")
                 self._set_state(RecordingState.IDLE)
@@ -206,40 +203,44 @@ class SpeechToTextCLI:
         """Display current configuration settings"""
         print("\n📋 Current Settings:")
         print("-" * 30)
-        
+
         # Language settings
-        language_name = self._get_language_display_name(self.config.transcription_language)
+        language_name = self._get_language_display_name(
+            self.config.transcription_language
+        )
         print(f"🌍 Language: {language_name}")
-        
+
         # Model size
         model_name = self._get_model_display_name(self.config.model_size)
         print(f"🧠 Model: {model_name}")
-        
+
         # Microphone device
         if self.config.microphone_device is None:
             print("🎤 Microphone: Default (System Default)")
         else:
             device_name = self._get_device_name(self.config.microphone_device)
             print(f"🎤 Microphone: {device_name}")
-        
+
         # VAD settings
         print(f"🔊 VAD Aggressiveness: {self.config.vad_aggressiveness}/3")
-        
+
         # Auto-insert setting
         insert_status = "Enabled" if self.config.enable_auto_insert else "Disabled"
         print(f"📝 Auto-insert: {insert_status}")
-        
+
         print("-" * 30)
 
     def _get_language_display_name(self, lang_code: str) -> str:
         """Get display name for language code"""
         from src.config import Config
+
         available_languages = Config.get_available_languages()
         return available_languages.get(lang_code, lang_code)
 
     def _get_model_display_name(self, model_code: str) -> str:
         """Get display name for model code"""
         from src.config import Config
+
         available_models = Config.get_available_models()
         return available_models.get(model_code, model_code)
 
@@ -248,7 +249,10 @@ class SpeechToTextCLI:
         try:
             devices = self.audio_recorder.get_available_devices()
             for device in devices:
-                if device.get("index") == device_id and device["max_input_channels"] > 0:
+                if (
+                    device.get("index") == device_id
+                    and device["max_input_channels"] > 0
+                ):
                     return f"{device['name']} (Device {device_id})"
             return f"Device {device_id} (Unknown)"
         except Exception:
@@ -271,13 +275,11 @@ class SpeechToTextCLI:
 
         print("\nInstructions:")
         print("- Double-press Shift to start/stop recording")
-        print("- After transcription, click anywhere to paste text")
+        print("- Text will be automatically pasted after transcription")
         print("- Type 'quit' to exit")
         print()
 
-        print(
-            "📋 Status indicators: ⏺️ Ready | 🔴 Recording | 🔄 Processing | 📋 Click to paste"
-        )
+        print("📋 Status indicators: ⏺️ Ready | 🔴 Recording | 🔄 Processing")
         print("💡 For visual screen indicator, use GUI mode: python main.py")
         print()
 
