@@ -4,6 +4,7 @@ import time
 import threading
 import subprocess
 import shlex
+import platform
 from typing import Optional, Callable
 
 
@@ -32,6 +33,14 @@ class TextInserter:
         self.paste_delay = 0.05  # seconds to wait after copying to clipboard
         self.live_paste_interval = 0.3  # seconds between live paste operations
         self.restore_clipboard = True  # whether to restore original clipboard content
+
+    def _get_modifier_key(self) -> str:
+        """Get the appropriate modifier key for the current platform"""
+        system = platform.system().lower()
+        if system == "darwin":  # macOS
+            return "cmd"
+        else:  # Windows, Linux, and others
+            return "ctrl"
 
     def configure_pasting(
         self,
@@ -145,23 +154,25 @@ class TextInserter:
     def _execute_paste(self) -> bool:
         """Execute paste operation using configured method"""
         try:
-            if self.paste_method == "applescript":
+            # AppleScript only works on macOS
+            is_macos = platform.system().lower() == "darwin"
+
+            if self.paste_method == "applescript" and is_macos:
                 # Method 1: AppleScript paste (most reliable on macOS)
                 if self._paste_with_applescript():
                     return True
                 # Fallback to keyboard shortcut if AppleScript fails
                 print("AppleScript paste failed, falling back to keyboard shortcut")
-                pyautogui.hotkey("cmd", "v")
-                return True
-
-            elif self.paste_method == "keyboard":
-                # Method 2: Direct keyboard shortcut
-                pyautogui.hotkey("cmd", "v")
+                pyautogui.hotkey(self._get_modifier_key(), "v")
                 return True
 
             else:
-                print(f"Unknown paste method: {self.paste_method}, using default")
-                pyautogui.hotkey("cmd", "v")
+                # Method 2: Direct keyboard shortcut (cross-platform)
+                if self.paste_method == "applescript" and not is_macos:
+                    print(
+                        "AppleScript not supported on this platform, using keyboard shortcut"
+                    )
+                pyautogui.hotkey(self._get_modifier_key(), "v")
                 return True
 
         except (OSError, pyautogui.FailSafeException) as e:
