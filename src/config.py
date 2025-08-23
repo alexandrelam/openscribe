@@ -6,7 +6,7 @@ from typing import Optional
 
 @dataclass
 class Config:
-    hotkey: str = "cmd+shift+r"
+    hotkey: str = "alt_r"
     # Legacy field for backward compatibility (will be migrated to transcription_language)
     language: str = "en-US"
     timeout: int = 5
@@ -26,6 +26,11 @@ class Config:
     live_quality_mode: str = "balanced"  # "fast", "balanced", "accurate"
     enable_overlap_detection: bool = True  # Enable text overlap detection and removal
     debug_text_assembly: bool = False  # Enable verbose logging for text assembly
+
+    # Transcription timeout configuration
+    transcription_timeout: float = (
+        30.0  # timeout in seconds for transcription (0 = no timeout)
+    )
 
     # VAD configuration
     vad_aggressiveness: int = 2  # 0-3, higher = more aggressive
@@ -67,7 +72,10 @@ class Config:
             or (isinstance(x, int) and x >= -1),
             "hotkey": lambda x: isinstance(x, str)
             and len(x) <= 50
-            and all(c.isalnum() or c in "+-_" for c in x),
+            and (
+                all(c.isalnum() or c in "+-_<>" for c in x)
+                or x in ["alt_l", "alt_r", "shift_l", "shift_r", "ctrl_l", "ctrl_r"]
+            ),
             "transcription_language": lambda x: isinstance(x, str)
             and (len(x) <= 10 and (x.isalpha() or x == "auto")),
             "model_size": lambda x: isinstance(x, str)
@@ -82,6 +90,9 @@ class Config:
             and x in ["applescript", "keyboard"],
             "whisper_provider": lambda x: isinstance(x, str)
             and x in ["faster-whisper", "whisper-cpp"],
+            "transcription_timeout": lambda x: isinstance(x, (int, float))
+            and x >= 0
+            and x <= 300,  # 0 to 5 minutes max
         }
 
         for key, value in data.items():

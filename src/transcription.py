@@ -81,6 +81,8 @@ class TranscriptionEngine:
         live_quality_mode: str = "balanced",
         enable_overlap_detection: bool = True,
         debug_text_assembly: bool = False,
+        async_loading: bool = False,
+        callback: Optional[Callable] = None,
     ):
         """Configure language settings and reload model if necessary"""
         return self.provider.configure_language(
@@ -89,6 +91,8 @@ class TranscriptionEngine:
             live_quality_mode=live_quality_mode,
             enable_overlap_detection=enable_overlap_detection,
             debug_text_assembly=debug_text_assembly,
+            async_loading=async_loading,
+            callback=callback,
         )
 
     def get_language_info(self) -> dict:
@@ -96,10 +100,13 @@ class TranscriptionEngine:
         return self.provider.get_language_info()
 
     def transcribe_audio(
-        self, audio_data: np.ndarray, sample_rate: int = 16000
+        self,
+        audio_data: np.ndarray,
+        sample_rate: int = 16000,
+        timeout: Optional[float] = None,
     ) -> Optional[str]:
         """Transcribe audio data and return the transcribed text"""
-        return self.provider.transcribe_audio(audio_data, sample_rate)
+        return self.provider.transcribe_audio(audio_data, sample_rate, timeout)
 
     def start_streaming_transcription(self, callback: Callable[[str], None]):
         """Start streaming transcription mode with text assembly"""
@@ -126,3 +133,8 @@ class TranscriptionEngine:
     def provider_info(self) -> dict:
         """Return information about the current provider"""
         return self.provider.provider_info
+
+    def cleanup_resources(self):
+        """Clean up provider resources to free memory"""
+        if self.provider:
+            self.provider.cleanup_resources()

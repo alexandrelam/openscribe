@@ -46,8 +46,8 @@ class SpeechToTextCLI:
         self.last_transcribed_text = None
         self.running = True
 
-        # Set up double key callbacks
-        self.double_key_detector.set_callbacks(on_double_shift=self._on_double_shift)
+        # Set up double Alt key detection only (disable all other double-key detection)
+        self.double_key_detector.set_callbacks(on_double_alt=self._on_double_shift)
 
         # Apply configurations on startup
         self._apply_vad_config()
@@ -97,7 +97,9 @@ class SpeechToTextCLI:
                 # Reset to idle if user presses double-shift while waiting to paste
                 self.text_inserter.stop_auto_insert_mode()
                 self._set_state(RecordingState.IDLE)
-                self._print_status("Ready - Double-press Shift to start recording")
+                self._print_status(
+                    "Ready - Double-tap right Option key to start recording"
+                )
 
     def _start_recording(self):
         """Start recording audio"""
@@ -106,7 +108,7 @@ class SpeechToTextCLI:
                 self._set_state(RecordingState.RECORDING)
                 self.sound_notifications.play_start_recording()
                 self._print_status(
-                    "Recording... Speak now! (Double-press Shift again to stop)"
+                    "Recording... Speak now! (Double-tap right Option key to stop)"
                 )
             else:
                 self._print_status(
@@ -133,12 +135,14 @@ class SpeechToTextCLI:
             else:
                 self._print_status("❌ No audio data recorded")
                 self._set_state(RecordingState.IDLE)
-                self._print_status("Ready - Double-press Shift to start recording")
+                self._print_status(
+                    "Ready - Double-tap right Option key to start recording"
+                )
 
         except Exception as e:
             self._print_status(f"❌ Error stopping recording: {e}")
             self._set_state(RecordingState.IDLE)
-            self._print_status("Ready - Double-press Shift to start recording")
+            self._print_status("Ready - Press right Option key to start recording")
 
     def _transcribe_audio(self, audio_data):
         """Transcribe audio data and prepare for pasting"""
@@ -159,7 +163,9 @@ class SpeechToTextCLI:
                     self._print_status("❌ Failed to paste text")
 
                 self._set_state(RecordingState.IDLE)
-                self._print_status("Ready - Double-press Shift to start recording")
+                self._print_status(
+                    "Ready - Double-tap right Option key to start recording"
+                )
             else:
                 self._print_status("❌ No speech detected or transcription failed")
                 self._set_state(RecordingState.IDLE)
@@ -176,7 +182,7 @@ class SpeechToTextCLI:
             self._print_status("⏰ Paste timeout or failed")
 
         self._set_state(RecordingState.IDLE)
-        self._print_status("Ready - Double-press Shift to start recording")
+        self._print_status("Ready - Press right Option key to start recording")
 
     def _apply_vad_config(self):
         """Apply VAD configuration to the audio recorder"""
@@ -298,7 +304,7 @@ class SpeechToTextCLI:
                 print(f"  {i}: {device['name']}")
 
         print("\nInstructions:")
-        print("- Double-press Shift to start/stop recording")
+        print("- Double-tap right Option key to start/stop recording")
         print("- Text will be automatically pasted after transcription")
         print("- Type 'quit' to exit")
         print()
@@ -307,14 +313,16 @@ class SpeechToTextCLI:
         print("💡 For visual screen indicator, use GUI mode: python main.py")
         print()
 
-        print("⚠️  IMPORTANT: If double-Shift doesn't work, make sure this app has")
+        print(
+            "⚠️  IMPORTANT: If double-tap right Option key doesn't work, make sure this app has"
+        )
         print("   Accessibility permissions in System Preferences > Security & Privacy")
         print()
 
         # Start the double key detector
         try:
             self.double_key_detector.start()
-            self._print_status("Ready - Double-press Shift to start recording")
+            self._print_status("Ready - Press right Option key to start recording")
         except Exception as e:
             print(f"❌ Failed to start keyboard listener: {e}")
             print("⚠️  Make sure this app has Accessibility permissions:")
@@ -362,7 +370,7 @@ class SpeechToTextCLI:
                             print("- quit: Exit the application")
                             print("- status: Show current state")
                             print("- help: Show this help")
-                            print("- Double-press Shift: Start/Stop recording")
+                            print("- Double-tap right Option key: Start/Stop recording")
 
                     except EOFError:
                         # Handle Ctrl+D

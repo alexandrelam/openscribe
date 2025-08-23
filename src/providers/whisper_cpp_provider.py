@@ -78,11 +78,12 @@ class WhisperCppProvider(BaseWhisperProvider):
     def _validate_model_filename(self, filename: str) -> bool:
         """Validate model filename to prevent injection attacks"""
         import re
+
         # Only allow alphanumeric, dots, hyphens, underscores
-        if not re.match(r'^[a-zA-Z0-9._-]+\.bin$', filename):
+        if not re.match(r"^[a-zA-Z0-9._-]+\.bin$", filename):
             return False
         # Prevent directory traversal
-        if '..' in filename or '/' in filename or '\\' in filename:
+        if ".." in filename or "/" in filename or "\\" in filename:
             return False
         return True
 
@@ -112,7 +113,7 @@ class WhisperCppProvider(BaseWhisperProvider):
             model_key = self.model_size
 
         model_filename = model_mapping.get(model_key, "ggml-small.bin")
-        
+
         # Validate model filename for security
         if not self._validate_model_filename(model_filename):
             raise ValueError(f"Invalid model filename: {model_filename}")
@@ -133,20 +134,22 @@ class WhisperCppProvider(BaseWhisperProvider):
             # Try other downloaded models as fallbacks
             fallback_models = [
                 "ggml-small.en.bin",
-                "ggml-base.en.bin", 
+                "ggml-base.en.bin",
                 "ggml-tiny.en.bin",
                 "ggml-small.bin",
                 "ggml-base.bin",
                 "ggml-tiny.bin",
             ]
-            
+
             for fallback in fallback_models:
                 if fallback != model_filename:
-                    model_paths.extend([
-                        f"~/whisper-models/{fallback}",
-                        f"/opt/homebrew/share/whisper-cpp/{fallback}",
-                    ])
-            
+                    model_paths.extend(
+                        [
+                            f"~/whisper-models/{fallback}",
+                            f"/opt/homebrew/share/whisper-cpp/{fallback}",
+                        ]
+                    )
+
             # Add test model as last resort
             model_paths.extend(
                 [
@@ -160,9 +163,9 @@ class WhisperCppProvider(BaseWhisperProvider):
         for path in model_paths:
             expanded_path = os.path.expanduser(path)
             # Validate path doesn't contain dangerous characters
-            if any(char in expanded_path for char in ['|', '&', ';', '`', '$']):
+            if any(char in expanded_path for char in ["|", "&", ";", "`", "$"]):
                 continue
-            
+
             if "*" in expanded_path:
                 # Handle glob patterns safely
                 try:
@@ -205,9 +208,13 @@ class WhisperCppProvider(BaseWhisperProvider):
         live_quality_mode: str = "balanced",
         enable_overlap_detection: bool = True,
         debug_text_assembly: bool = False,
+        async_loading: bool = False,
+        callback: Optional[Callable] = None,
     ):
         """Configure language settings and reload model if necessary"""
         old_language_config = self.language_config
+        old_model_size = self.model_size
+
         self.language_config = language_config
         self.model_size = model_size
         self.live_quality_mode = live_quality_mode
@@ -215,9 +222,20 @@ class WhisperCppProvider(BaseWhisperProvider):
         self.debug_text_assembly = debug_text_assembly
         self.language_detection_enabled = language_config == "auto"
 
-        # Reload model if language configuration changed
-        if old_language_config != language_config:
-            self._load_model()
+        # Reload model if language/model configuration changed
+        if old_language_config != language_config or old_model_size != model_size:
+            if async_loading:
+                # For whisper.cpp, model loading is fast so we'll just do it synchronously
+                # but call the callback to maintain interface compatibility
+                try:
+                    self._load_model()
+                    if callback:
+                        callback(True, None)
+                except Exception as e:
+                    if callback:
+                        callback(False, str(e))
+            else:
+                self._load_model()
             print(f"🌍 Language configuration updated: {language_config}")
 
     def get_language_info(self) -> dict:
@@ -231,7 +249,10 @@ class WhisperCppProvider(BaseWhisperProvider):
         }
 
     def transcribe_audio(
-        self, audio_data: np.ndarray, sample_rate: int = 16000
+        self,
+        audio_data: np.ndarray,
+        sample_rate: int = 16000,
+        timeout: Optional[float] = None,
     ) -> Optional[str]:
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
@@ -241,18 +262,22 @@ class WhisperCppProvider(BaseWhisperProvider):
             try:
                 # Build whisper-cli command with validation
                 if not self.model_path or not os.path.exists(self.model_path):
-                    raise ValueError(f"Model path not found or invalid: {self.model_path}")
-                
+                    raise ValueError(
+                        f"Model path not found or invalid: {self.model_path}"
+                    )
+
                 # Validate temp filename
-                if not os.path.exists(temp_filename) or not temp_filename.endswith('.wav'):
+                if not os.path.exists(temp_filename) or not temp_filename.endswith(
+                    ".wav"
+                ):
                     raise ValueError(f"Invalid temp file: {temp_filename}")
-                
+
                 cmd = [
                     "whisper-cli",
                     "-m",
                     os.path.abspath(self.model_path),  # Use absolute path
                     "-f",
-                    os.path.abspath(temp_filename),    # Use absolute path
+                    os.path.abspath(temp_filename),  # Use absolute path
                     "-np",  # No prints (suppress extra output)
                     "-nt",  # No timestamps
                     "-otxt",  # Output as text
@@ -261,18 +286,26 @@ class WhisperCppProvider(BaseWhisperProvider):
                 # Add language parameter if not auto-detecting (with validation)
                 if self.language_config != "auto":
                     # Validate language code (2-3 letter codes only)
-                    if not self.language_config.isalpha() or len(self.language_config) > 3:
-                        raise ValueError(f"Invalid language config: {self.language_config}")
+                    if (
+                        not self.language_config.isalpha()
+                        or len(self.language_config) > 3
+                    ):
+                        raise ValueError(
+                            f"Invalid language config: {self.language_config}"
+                        )
                     cmd.extend(["-l", self.language_config])
                 else:
                     cmd.extend(["-l", "auto"])
 
-                # Run whisper-cli
+                # Run whisper-cli with configurable timeout
+                subprocess_timeout = (
+                    timeout if timeout else 30.0
+                )  # Default 30 second timeout
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=30,  # 30 second timeout
+                    timeout=subprocess_timeout,
                 )
 
                 if result.returncode != 0:

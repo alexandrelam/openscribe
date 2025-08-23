@@ -41,6 +41,8 @@ class BaseWhisperProvider(ABC):
         live_quality_mode: str = "balanced",
         enable_overlap_detection: bool = True,
         debug_text_assembly: bool = False,
+        async_loading: bool = False,
+        callback: Optional[Callable] = None,
     ):
         """Configure language settings and reload model if necessary"""
         pass
@@ -52,7 +54,10 @@ class BaseWhisperProvider(ABC):
 
     @abstractmethod
     def transcribe_audio(
-        self, audio_data: np.ndarray, sample_rate: int = 16000
+        self,
+        audio_data: np.ndarray,
+        sample_rate: int = 16000,
+        timeout: Optional[float] = None,
     ) -> Optional[str]:
         """
         Transcribe audio data and return the transcribed text.
@@ -60,6 +65,7 @@ class BaseWhisperProvider(ABC):
         Args:
             audio_data: Audio data as numpy array
             sample_rate: Sample rate of the audio data
+            timeout: Optional timeout in seconds to prevent indefinite blocking
 
         Returns:
             Transcribed text or None if no speech detected
@@ -106,4 +112,8 @@ class BaseWhisperProvider(ABC):
     @abstractmethod
     def provider_info(self) -> dict:
         """Return information about this provider"""
+        pass
+
+    def cleanup_resources(self):
+        """Clean up provider resources to free memory (optional override)"""
         pass

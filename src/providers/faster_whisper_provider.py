@@ -76,6 +76,45 @@ class FasterWhisperProvider(BaseWhisperProvider):
             self.current_model_name = model_name
             print(f"✅ Faster Whisper model loaded: {model_name}")
 
+    def _load_model_async(self, model_name: str, callback: Optional[Callable] = None):
+        """Load model asynchronously to prevent GUI blocking"""
+
+        def load_model():
+            try:
+                print(f"🔄 Loading Faster Whisper model: {model_name}")
+
+                # Clean up old model to free memory
+                if hasattr(self, "model") and self.model is not None:
+                    print("🧹 Releasing previous model to free memory")
+                    del self.model
+                    import gc
+
+                    gc.collect()  # Force garbage collection
+
+                model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                self.model = model
+                self.current_model_name = model_name
+                print(f"✅ Faster Whisper model loaded: {model_name}")
+                if callback:
+                    callback(True, None)
+            except Exception as e:
+                print(f"❌ Failed to load model {model_name}: {e}")
+                if callback:
+                    callback(False, str(e))
+
+        threading.Thread(target=load_model, daemon=True).start()
+
+    def cleanup_resources(self):
+        """Clean up model resources to free memory"""
+        if hasattr(self, "model") and self.model is not None:
+            print("🧹 Cleaning up Faster Whisper model resources")
+            del self.model
+            self.model = None
+            self.current_model_name = None
+            import gc
+
+            gc.collect()
+
     def configure_language(
         self,
         language_config: str = "auto",
@@ -83,9 +122,13 @@ class FasterWhisperProvider(BaseWhisperProvider):
         live_quality_mode: str = "balanced",
         enable_overlap_detection: bool = True,
         debug_text_assembly: bool = False,
+        async_loading: bool = False,
+        callback: Optional[Callable] = None,
     ):
         """Configure language settings and reload model if necessary"""
         old_language_config = self.language_config
+        old_model_size = self.model_size
+
         self.language_config = language_config
         self.model_size = model_size
         self.live_quality_mode = live_quality_mode
@@ -93,9 +136,20 @@ class FasterWhisperProvider(BaseWhisperProvider):
         self.debug_text_assembly = debug_text_assembly
         self.language_detection_enabled = language_config == "auto"
 
-        # Reload model if language configuration changed
-        if old_language_config != language_config:
-            self._load_model()
+        # Determine new model name
+        if language_config == "en":
+            new_model_name = f"{model_size}.en"
+        else:
+            new_model_name = model_size
+
+        # Reload model if language/model configuration changed
+        if (
+            old_language_config != language_config or old_model_size != model_size
+        ) and new_model_name != self.current_model_name:
+            if async_loading:
+                self._load_model_async(new_model_name, callback)
+            else:
+                self._load_model()
             print(f"🌍 Language configuration updated: {language_config}")
 
     def get_language_info(self) -> dict:
@@ -109,8 +163,12 @@ class FasterWhisperProvider(BaseWhisperProvider):
         }
 
     def transcribe_audio(
-        self, audio_data: np.ndarray, sample_rate: int = 16000
+        self,
+        audio_data: np.ndarray,
+        sample_rate: int = 16000,
+        timeout: Optional[float] = None,
     ) -> Optional[str]:
+        """Transcribe audio with optional timeout to prevent indefinite blocking"""
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
                 sf.write(temp_file.name, audio_data.flatten(), sample_rate)
@@ -127,10 +185,16 @@ class FasterWhisperProvider(BaseWhisperProvider):
                 if self.language_config != "auto":
                     transcribe_params["language"] = self.language_config
 
-                # Transcribe using faster-whisper
-                segments, info = self.model.transcribe(
-                    temp_filename, **transcribe_params
-                )
+                # Use timeout-aware transcription
+                if timeout:
+                    segments, info = self._transcribe_with_timeout(
+                        temp_filename, transcribe_params, timeout
+                    )
+                else:
+                    # Transcribe using faster-whisper
+                    segments, info = self.model.transcribe(
+                        temp_filename, **transcribe_params
+                    )
 
                 # Update language detection info
                 self.detected_language = info.language
@@ -169,6 +233,25 @@ class FasterWhisperProvider(BaseWhisperProvider):
         except Exception as e:
             print(f"❌ Transcription error: {e}")
             return None
+
+    def _transcribe_with_timeout(
+        self, temp_filename: str, transcribe_params: dict, timeout: float
+    ):
+        """Transcribe audio with timeout using threading"""
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                self.model.transcribe, temp_filename, **transcribe_params
+            )
+            try:
+                segments, info = future.result(timeout=timeout)
+                return segments, info
+            except concurrent.futures.TimeoutError:
+                print(f"⏰ Transcription timeout after {timeout} seconds")
+                # Cancel the future if possible
+                future.cancel()
+                raise TimeoutError(f"Transcription timed out after {timeout} seconds")
 
     def start_streaming_transcription(self, callback: Callable[[str], None]):
         """Start streaming transcription mode with text assembly"""

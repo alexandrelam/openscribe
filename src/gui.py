@@ -177,15 +177,32 @@ class SettingsDialog:
             main_frame,
             text="Show language detection info",
             variable=self.language_detection_var,
-        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 20))
+        ).grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+
+        ttk.Label(main_frame, text="Transcription timeout (seconds):").grid(
+            row=11, column=0, sticky=tk.W, pady=(0, 5)
+        )
+
+        self.transcription_timeout_var = tk.StringVar(
+            value=str(getattr(self.config, "transcription_timeout", 30.0))
+        )
+        timeout_spinbox = ttk.Spinbox(
+            main_frame,
+            from_=5,
+            to=300,
+            increment=5,
+            textvariable=self.transcription_timeout_var,
+            width=10,
+        )
+        timeout_spinbox.grid(row=11, column=1, sticky=tk.W, pady=(0, 20))
 
         # VAD settings
         ttk.Label(
             main_frame, text="Voice Activity Detection:", font=("Arial", 12, "bold")
-        ).grid(row=11, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=12, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         ttk.Label(main_frame, text="Aggressiveness (0-3):").grid(
-            row=12, column=0, sticky=tk.W, pady=(0, 5)
+            row=13, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_aggressiveness_var = tk.StringVar(
@@ -198,10 +215,10 @@ class SettingsDialog:
             textvariable=self.vad_aggressiveness_var,
             width=10,
         )
-        aggressiveness_spinbox.grid(row=12, column=1, sticky=tk.W, pady=(0, 5))
+        aggressiveness_spinbox.grid(row=13, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Min chunk duration (s):").grid(
-            row=11, column=0, sticky=tk.W, pady=(0, 5)
+            row=14, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_min_duration_var = tk.StringVar(
@@ -215,10 +232,10 @@ class SettingsDialog:
             textvariable=self.vad_min_duration_var,
             width=10,
         )
-        min_duration_spinbox.grid(row=13, column=1, sticky=tk.W, pady=(0, 5))
+        min_duration_spinbox.grid(row=14, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Max chunk duration (s):").grid(
-            row=12, column=0, sticky=tk.W, pady=(0, 5)
+            row=15, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_max_duration_var = tk.StringVar(
@@ -232,10 +249,10 @@ class SettingsDialog:
             textvariable=self.vad_max_duration_var,
             width=10,
         )
-        max_duration_spinbox.grid(row=14, column=1, sticky=tk.W, pady=(0, 5))
+        max_duration_spinbox.grid(row=15, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Silence timeout (s):").grid(
-            row=13, column=0, sticky=tk.W, pady=(0, 5)
+            row=16, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.vad_silence_timeout_var = tk.StringVar(
@@ -249,12 +266,12 @@ class SettingsDialog:
             textvariable=self.vad_silence_timeout_var,
             width=10,
         )
-        silence_timeout_spinbox.grid(row=15, column=1, sticky=tk.W, pady=(0, 20))
+        silence_timeout_spinbox.grid(row=16, column=1, sticky=tk.W, pady=(0, 20))
 
         # Recording Indicator settings
         ttk.Label(
             main_frame, text="Recording Indicator:", font=("Arial", 12, "bold")
-        ).grid(row=16, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=17, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         self.show_indicator_var = tk.BooleanVar(
             value=self.config.show_recording_indicator
@@ -263,14 +280,14 @@ class SettingsDialog:
             main_frame,
             text="Show fixed position recording indicator",
             variable=self.show_indicator_var,
-        ).grid(row=17, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        ).grid(row=18, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
 
         ttk.Label(main_frame, text="Screen position (X, Y):").grid(
-            row=16, column=0, sticky=tk.W, pady=(0, 5)
+            row=19, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         position_frame = ttk.Frame(main_frame)
-        position_frame.grid(row=18, column=1, sticky=tk.W, pady=(0, 5))
+        position_frame.grid(row=19, column=1, sticky=tk.W, pady=(0, 5))
 
         self.indicator_position_x_var = tk.StringVar(
             value=str(self.config.indicator_position_x)
@@ -297,17 +314,17 @@ class SettingsDialog:
         position_y_spinbox.pack(side=tk.LEFT)
 
         ttk.Label(main_frame, text="Size (pixels):").grid(
-            row=17, column=0, sticky=tk.W, pady=(0, 5)
+            row=20, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.indicator_size_var = tk.StringVar(value=str(self.config.indicator_size))
         size_spinbox = ttk.Spinbox(
             main_frame, from_=10, to=50, textvariable=self.indicator_size_var, width=10
         )
-        size_spinbox.grid(row=19, column=1, sticky=tk.W, pady=(0, 5))
+        size_spinbox.grid(row=20, column=1, sticky=tk.W, pady=(0, 5))
 
         ttk.Label(main_frame, text="Opacity (0.1-1.0):").grid(
-            row=18, column=0, sticky=tk.W, pady=(0, 5)
+            row=21, column=0, sticky=tk.W, pady=(0, 5)
         )
 
         self.indicator_opacity_var = tk.StringVar(
@@ -321,11 +338,11 @@ class SettingsDialog:
             textvariable=self.indicator_opacity_var,
             width=10,
         )
-        opacity_spinbox.grid(row=20, column=1, sticky=tk.W, pady=(0, 20))
+        opacity_spinbox.grid(row=21, column=1, sticky=tk.W, pady=(0, 20))
 
         # Buttons
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=21, column=0, columnspan=2, pady=(20, 0))
+        button_frame.grid(row=22, column=0, columnspan=2, pady=(20, 0))
 
         ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(
             side=tk.RIGHT, padx=(10, 0)
@@ -407,6 +424,11 @@ class SettingsDialog:
 
             self.config.language_detection_enabled = self.language_detection_var.get()
 
+            # Update transcription timeout config
+            self.config.transcription_timeout = float(
+                self.transcription_timeout_var.get()
+            )
+
             # Update VAD config
             self.config.vad_aggressiveness = int(self.vad_aggressiveness_var.get())
             self.config.vad_min_chunk_duration = float(self.vad_min_duration_var.get())
@@ -478,6 +500,8 @@ class SpeechToTextGUI:
         self.recording = False
         self.processing = False
         self.live_mode_active = False
+        self.current_transcription_thread = None
+        self.transcription_cancelled = False
 
         self.setup_ui()
         self.setup_all_shortcuts()
@@ -545,32 +569,62 @@ class SpeechToTextGUI:
             self._setup_double_key_shortcuts()
 
     def _setup_traditional_hotkey(self):
-        """Setup the traditional cmd+shift+r hotkey"""
+        """Setup the configurable hotkey"""
         try:
             from pynput import keyboard
 
             def on_hotkey():
                 self.root.after(0, lambda: self.toggle_recording_with_source("hotkey"))
 
-            hotkey = keyboard.HotKey(
-                keyboard.HotKey.parse("<cmd>+<shift>+r"), on_hotkey
-            )
+            # Check if this is a single key or a key combination
+            hotkey_str = self.config.hotkey
 
-            # Create listener first
-            self.hotkey_listener = keyboard.Listener()
+            # Single key hotkeys (like alt_r, shift_l, etc.)
+            single_key_map = {
+                "alt_l": keyboard.Key.alt_l,
+                "alt_r": keyboard.Key.alt_r,
+                "shift_l": keyboard.Key.shift_l,
+                "shift_r": keyboard.Key.shift_r,
+                "ctrl_l": keyboard.Key.ctrl_l,
+                "ctrl_r": keyboard.Key.ctrl_r,
+            }
 
-            def for_canonical(f):
-                return lambda k: f(self.hotkey_listener.canonical(k))
+            if hotkey_str in single_key_map:
+                # Handle single key press
+                target_key = single_key_map[hotkey_str]
 
-            # Now recreate with proper callbacks
-            self.hotkey_listener = keyboard.Listener(
-                on_press=for_canonical(hotkey.press),
-                on_release=for_canonical(hotkey.release),
-            )
-            self.hotkey_listener.start()
+                def on_press(key):
+                    if key == target_key:
+                        on_hotkey()
+
+                def on_release(key):
+                    pass  # We only care about press events for single keys
+
+                self.hotkey_listener = keyboard.Listener(
+                    on_press=on_press,
+                    on_release=on_release,
+                )
+                self.hotkey_listener.start()
+
+            else:
+                # Handle key combinations (existing logic)
+                hotkey = keyboard.HotKey(keyboard.HotKey.parse(hotkey_str), on_hotkey)
+
+                # Create listener first
+                self.hotkey_listener = keyboard.Listener()
+
+                def for_canonical(f):
+                    return lambda k: f(self.hotkey_listener.canonical(k))
+
+                # Now recreate with proper callbacks
+                self.hotkey_listener = keyboard.Listener(
+                    on_press=for_canonical(hotkey.press),
+                    on_release=for_canonical(hotkey.release),
+                )
+                self.hotkey_listener.start()
 
         except Exception as e:
-            print(f"Failed to setup traditional hotkey: {e}")
+            print(f"Failed to setup hotkey: {e}")
 
     def _setup_double_key_shortcuts(self):
         """Setup double key press shortcuts"""
@@ -650,7 +704,17 @@ class SpeechToTextGUI:
         if not self.recording:
             return
 
+        # Cancel any ongoing transcription
+        self.transcription_cancelled = True
+        if (
+            self.current_transcription_thread
+            and self.current_transcription_thread.is_alive()
+        ):
+            # Give the thread a moment to notice the cancellation
+            self.current_transcription_thread.join(timeout=1.0)
+
         self.recording = False
+        self.transcription_cancelled = False
         self.progress.stop()
         self.record_button.config(text="Processing...", state="disabled")
         self.status_label.config(text="Processing audio...")
@@ -661,17 +725,43 @@ class SpeechToTextGUI:
 
         def process_audio():
             try:
+                if self.transcription_cancelled:
+                    self.root.after(0, lambda: self.handle_transcription(None))
+                    return
+
                 audio_data = self.audio_recorder.stop_recording()
                 if audio_data is not None and len(audio_data) > 0:
-                    text = self.transcription_engine.transcribe_audio(audio_data)
-                    self.root.after(0, lambda: self.handle_transcription(text))
+                    # Use timeout from configuration (0 means no timeout)
+                    timeout = (
+                        self.config.transcription_timeout
+                        if self.config.transcription_timeout > 0
+                        else None
+                    )
+
+                    if self.transcription_cancelled:
+                        self.root.after(0, lambda: self.handle_transcription(None))
+                        return
+
+                    text = self.transcription_engine.transcribe_audio(
+                        audio_data, timeout=timeout
+                    )
+
+                    if not self.transcription_cancelled:
+                        self.root.after(0, lambda: self.handle_transcription(text))
                 else:
                     self.root.after(0, lambda: self.handle_transcription(None))
+            except TimeoutError as e:
+                print(f"⏰ Transcription timeout: {e}")
+                self.root.after(0, lambda: self.handle_timeout_error())
             except Exception as e:
-                self.root.after(0, lambda: self.handle_error(str(e)))
+                if not self.transcription_cancelled:
+                    self.root.after(0, lambda: self.handle_error(str(e)))
 
         self.processing = True
-        threading.Thread(target=process_audio, daemon=True).start()
+        self.current_transcription_thread = threading.Thread(
+            target=process_audio, daemon=True
+        )
+        self.current_transcription_thread.start()
 
     def handle_transcription(self, text: Optional[str]):
         self.processing = False
@@ -722,6 +812,25 @@ class SpeechToTextGUI:
         # Reset to "Ready" after a delay
         self.root.after(2000, lambda: self.status_label.config(text="Ready"))
 
+    def handle_timeout_error(self):
+        """Handle transcription timeout errors"""
+        self.processing = False
+        self.record_button.config(
+            text="🎤 Start Recording", state="normal", style="TButton"
+        )
+
+        # Hide indicator when timeout occurs
+        if self.config.show_recording_indicator:
+            self.recording_indicator.set_state(IndicatorState.HIDDEN)
+
+        self.status_label.config(text="⏰ Transcription timed out")
+        messagebox.showwarning(
+            "Timeout",
+            f"Transcription timed out after {self.config.transcription_timeout} seconds. "
+            "Try using a smaller model size in settings or increase the timeout.",
+        )
+        self.root.after(3000, lambda: self.status_label.config(text="Ready"))
+
     def handle_error(self, error_msg: str):
         self.processing = False
         self.record_button.config(
@@ -761,7 +870,7 @@ class SpeechToTextGUI:
                 )
                 self._apply_vad_config()
                 self._apply_paste_config()
-                self._apply_language_config()
+                self._apply_language_config_async()
                 self._apply_indicator_config()
                 self._apply_shortcuts_config()
                 messagebox.showinfo("Settings", "All settings updated successfully!")
@@ -774,7 +883,7 @@ class SpeechToTextGUI:
             # Apply configuration to existing components
             self._apply_vad_config()
             self._apply_paste_config()
-            self._apply_language_config()
+            self._apply_language_config_async()
             self._apply_indicator_config()
             self._apply_shortcuts_config()
             messagebox.showinfo("Settings", "Settings saved successfully!")
@@ -808,6 +917,32 @@ class SpeechToTextGUI:
                 live_quality_mode=self.config.live_quality_mode,
                 enable_overlap_detection=self.config.enable_overlap_detection,
                 debug_text_assembly=self.config.debug_text_assembly,
+            )
+
+    def _apply_language_config_async(self):
+        """Apply language configuration asynchronously to prevent GUI blocking"""
+        if self.transcription_engine:
+
+            def on_model_loaded(success: bool, error: Optional[str]):
+                if success:
+                    print("✅ Model loaded successfully")
+                else:
+                    print(f"❌ Model loading failed: {error}")
+                    self.root.after(
+                        0,
+                        lambda: messagebox.showerror(
+                            "Model Loading Error", f"Failed to load model: {error}"
+                        ),
+                    )
+
+            self.transcription_engine.configure_language(
+                language_config=self.config.transcription_language,
+                model_size=self.config.model_size,
+                live_quality_mode=self.config.live_quality_mode,
+                enable_overlap_detection=self.config.enable_overlap_detection,
+                debug_text_assembly=self.config.debug_text_assembly,
+                async_loading=True,
+                callback=on_model_loaded,
             )
 
     def _apply_indicator_config(self):
@@ -980,6 +1115,10 @@ class SpeechToTextGUI:
         # Stop traditional hotkey listener
         if hasattr(self, "hotkey_listener"):
             self.hotkey_listener.stop()
+
+        # Clean up transcription engine resources
+        if hasattr(self, "transcription_engine"):
+            self.transcription_engine.cleanup_resources()
 
         self.root.quit()
 
