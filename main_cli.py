@@ -25,7 +25,9 @@ class RecordingState(Enum):
 class SpeechToTextCLI:
     def __init__(self):
         self.config = Config.load()
-        self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
+        self.audio_recorder = AudioRecorder(
+            device_id=self.config.get_preferred_device()
+        )
         self.transcription_engine = TranscriptionEngine(
             language_config=self.config.transcription_language,
             model_size=self.config.model_size,
@@ -245,10 +247,11 @@ class SpeechToTextCLI:
         print(f"🧠 Model: {model_name}")
 
         # Microphone device
-        if self.config.microphone_device is None:
+        preferred_device = self.config.get_preferred_device()
+        if preferred_device is None:
             print("🎤 Microphone: Default (System Default)")
         else:
-            device_name = self._get_device_name(self.config.microphone_device)
+            device_name = self._get_device_name(preferred_device)
             print(f"🎤 Microphone: {device_name}")
 
         # VAD settings

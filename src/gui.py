@@ -51,7 +51,9 @@ class SpeechToTextGUI:
 
     def _init_business_logic(self):
         """Initialize business logic components"""
-        self.audio_recorder = AudioRecorder(device_id=self.config.microphone_device)
+        self.audio_recorder = AudioRecorder(
+            device_id=self.config.get_preferred_device()
+        )
         self.transcription_engine = TranscriptionEngine(
             language_config=self.config.transcription_language,
             model_size=self.config.model_size,
@@ -361,12 +363,11 @@ class SpeechToTextGUI:
 
         # Recreate AudioRecorder with new device if it changed
         old_device = getattr(self.audio_recorder, "device_id", None)
-        if old_device != self.config.microphone_device:
+        preferred_device = self.config.get_preferred_device()
+        if old_device != preferred_device:
             # Only recreate if not currently recording
             if not self.recording:
-                self.audio_recorder = AudioRecorder(
-                    device_id=self.config.microphone_device
-                )
+                self.audio_recorder = AudioRecorder(device_id=preferred_device)
                 self.transcription_engine = TranscriptionEngine(
                     language_config=self.config.transcription_language,
                     model_size=self.config.model_size,

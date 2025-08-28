@@ -1,7 +1,7 @@
 import os
 import json
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass
@@ -10,7 +10,7 @@ class Config:
     # Legacy field for backward compatibility (will be migrated to transcription_language)
     language: str = "en-US"
     timeout: int = 5
-    microphone_device: Optional[int] = None
+    microphone_preferences: List[int] = None
     always_on_top: bool = True
     enable_auto_insert: bool = True
     auto_insert_timeout: int = 10
@@ -61,6 +61,33 @@ class Config:
 
     CONFIG_FILE = "config.json"
 
+    def __post_init__(self):
+        """Initialize default values that can't be set in dataclass field defaults"""
+        if self.microphone_preferences is None:
+            self.microphone_preferences = []
+
+    def get_preferred_device(self) -> Optional[int]:
+        """Get the best available microphone device from preferences"""
+        if not self.microphone_preferences:
+            return None
+
+        # Import here to avoid circular imports
+        from .audio_recorder import AudioRecorder
+
+        try:
+            available_device_ids = AudioRecorder.get_available_device_ids()
+
+            # Check preferences in order and return first available one
+            for preferred_device_id in self.microphone_preferences:
+                if preferred_device_id in available_device_ids:
+                    return preferred_device_id
+
+            # If no preferred devices are available, return None (system default)
+            return None
+        except Exception as e:
+            print(f"⚠️ Error resolving preferred microphone device: {e}")
+            return None
+
     @classmethod
     def _validate_config_data(cls, data: dict) -> dict:
         """Validate and sanitize configuration data"""
@@ -68,8 +95,8 @@ class Config:
 
         # Define validation rules for each field
         validators = {
-            "microphone_device": lambda x: x is None
-            or (isinstance(x, int) and x >= -1),
+            "microphone_preferences": lambda x: isinstance(x, list)
+            and all(isinstance(item, int) and item >= -1 for item in x),
             "hotkey": lambda x: isinstance(x, str)
             and len(x) <= 50
             and (
@@ -132,7 +159,16 @@ class Config:
         return cls()
 
     def _migrate_legacy_settings(self):
-        """Migrate legacy language settings to new format"""
+        """Migrate legacy language and microphone settings to new format"""
+        # Migrate legacy microphone_device to microphone_preferences
+        if hasattr(self, "microphone_device") and self.microphone_device is not None:
+            if not self.microphone_preferences:  # Only migrate if preferences are empty
+                self.microphone_preferences = [self.microphone_device]
+                print(
+                    f"🔄 Migrated microphone device: {self.microphone_device} → preferences: {self.microphone_preferences}"
+                )
+            # Remove the old field to avoid confusion
+            delattr(self, "microphone_device")
         # If transcription_language is still default but legacy language exists
         if (
             self.transcription_language == "auto"

@@ -240,3 +240,26 @@ class AudioRecorder:
                     }
                 )
         return input_devices
+
+    @staticmethod
+    def get_available_device_ids():
+        """Get list of available input device IDs"""
+        try:
+            devices = sd.query_devices()
+            available_ids = []
+            for i, device in enumerate(devices):
+                if device["max_input_channels"] > 0:
+                    available_ids.append(i)
+            return available_ids
+        except Exception as e:
+            print(f"⚠️ Error querying available devices: {e}")
+            return []
+
+    @staticmethod
+    def is_device_available(device_id: int) -> bool:
+        """Check if a specific device ID is available for recording"""
+        try:
+            available_ids = AudioRecorder.get_available_device_ids()
+            return device_id in available_ids
+        except Exception:
+            return False
