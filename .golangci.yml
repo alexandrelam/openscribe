@@ -1,20 +1,22 @@
 # golangci-lint configuration for OpenScribe
 # Documentation: https://golangci-lint.run/usage/configuration/
 
+version: 2
+
 run:
   timeout: 5m
   tests: true
 
 linters:
   enable:
+    # Default linters (enabled automatically)
     - errcheck      # Check for unchecked errors
-    - gosimple      # Simplify code
     - govet         # Reports suspicious constructs
     - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Static analysis checks
+    - staticcheck   # Static analysis checks (includes gosimple)
     - unused        # Check for unused code
-    - gofmt         # Check if code is gofmt'd
-    - goimports     # Check if imports are formatted
+
+    # Additional linters
     - misspell      # Spell checker
     - revive        # Fast, configurable, extensible linter
 
@@ -22,6 +24,11 @@ linters:
     - exhaustive    # Too strict for switch statements
     - exhaustruct   # Too strict for struct initialization
     - varnamelen    # Variable name length (too opinionated)
+
+formatters:
+  enable:
+    - gofmt         # Check if code is gofmt'd
+    - goimports     # Check if imports are formatted
 
 linters-settings:
   errcheck:
@@ -70,6 +77,7 @@ issues:
 
 output:
   formats:
-    - format: colored-line-number
+    colored-line-number:
+      path: stdout
   print-issued-lines: true
   print-linter-name: true
