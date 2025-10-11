@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +24,101 @@ var configCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("Config command - Not yet implemented")
+		// Handle --show flag
+		if cmd.Flags().Changed("show") {
+			handleShowConfig()
+			return
+		}
+
+		// Handle --list-microphones flag
+		if cmd.Flags().Changed("list-microphones") {
+			handleListMicrophones()
+			return
+		}
+
+		// Handle set commands
+		if cmd.Flags().Changed("set-microphone") {
+			value, _ := cmd.Flags().GetString("set-microphone")
+			handleSetConfig("microphone", value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-model") {
+			value, _ := cmd.Flags().GetString("set-model")
+			handleSetConfig("model", value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-language") {
+			value, _ := cmd.Flags().GetString("set-language")
+			handleSetConfig("language", value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-hotkey") {
+			value, _ := cmd.Flags().GetString("set-hotkey")
+			handleSetConfig("hotkey", value)
+			return
+		}
 	},
+}
+
+func handleShowConfig() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Print(cfg.String())
+}
+
+func handleListMicrophones() {
+	// TODO: This will be implemented in Phase 4
+	fmt.Println("Available microphones:")
+	fmt.Println("  (Microphone listing will be implemented in Phase 4)")
+}
+
+func handleSetConfig(key, value string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Update the appropriate field
+	switch key {
+	case "microphone":
+		cfg.Microphone = value
+		fmt.Printf("Microphone set to: %s\n", value)
+	case "model":
+		cfg.Model = value
+		fmt.Printf("Model set to: %s\n", value)
+	case "language":
+		cfg.Language = value
+		if value == "" {
+			fmt.Println("Language set to: auto-detect")
+		} else {
+			fmt.Printf("Language set to: %s\n", value)
+		}
+	case "hotkey":
+		cfg.Hotkey = value
+		fmt.Printf("Hotkey set to: %s\n", value)
+	}
+
+	// Validate before saving
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Save the updated config
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Configuration saved successfully!")
 }
 
 func init() {
