@@ -331,7 +331,7 @@ Phase 13 (Distribution)
 - [x] Phase 2: Can run `openscribe config --show`
 - [x] Phase 3: Can run `openscribe setup` and download models
 - [x] Phase 4: Can list and select microphones
-- [ ] Phase 5: Can transcribe a test audio file
+- [x] Phase 5: Can transcribe a test audio file
 - [ ] Phase 6: Can view logs with `openscribe logs show`
 - [ ] Phase 7: Can detect hotkey double-press
 - [ ] Phase 8: Can hear feedback sounds
