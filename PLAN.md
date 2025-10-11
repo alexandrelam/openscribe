@@ -164,7 +164,7 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 
 ---
 
-## Phase 8: Audio Feedback System
+## Phase 8: Audio Feedback System ✅
 
 **Goal**: Add sound effects for recording state changes
 
@@ -181,6 +181,27 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 **Why this grouping**: Audio feedback is a nice-to-have that's independent of core functionality. Adding it late means it won't block critical features.
 
 **Test**: Trigger each sound manually, verify they're distinct and brief.
+
+**Implementation Notes**:
+- Created `internal/audio/feedback.go` with platform-agnostic interface
+- macOS implementation in `feedback_darwin.go` uses NSSound via CGo
+- Uses built-in macOS system sounds (no bundled files needed):
+  - Start: "Tink" (short ascending beep)
+  - Stop: "Pop" (short neutral beep)
+  - Complete: "Glass" (pleasant ding)
+- Added config commands:
+  - `--list-sounds`: Lists all available macOS system sounds
+  - `--test-sounds`: Plays all three feedback sounds in sequence
+  - `--enable-audio-feedback` / `--disable-audio-feedback`: Toggle audio feedback
+- Integrated into `openscribe start` command with graceful fallback if initialization fails
+- Audio feedback respects the `audio_feedback` config setting
+
+**Testing**:
+- Run `openscribe config --list-sounds` to see available sounds
+- Run `openscribe config --test-sounds` to hear the three feedback sounds
+- Run `openscribe config --enable-audio-feedback` to enable
+- Run `openscribe config --disable-audio-feedback` to disable
+- Start command plays sounds at appropriate state transitions
 
 ---
 
@@ -349,7 +370,7 @@ Phase 13 (Distribution)
 - [x] Phase 5: Can transcribe a test audio file
 - [x] Phase 6: Can view logs with `openscribe logs show`
 - [x] Phase 7: Can detect hotkey double-press
-- [ ] Phase 8: Can hear feedback sounds
+- [x] Phase 8: Can hear feedback sounds
 - [ ] Phase 9: Can auto-paste text at cursor
 - [ ] Phase 10: Full flow works end-to-end
 - [ ] Phase 11: All error cases handled gracefully

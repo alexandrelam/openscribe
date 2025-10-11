@@ -19,10 +19,14 @@ var configCmd = &cobra.Command{
 		if !cmd.Flags().Changed("show") &&
 			!cmd.Flags().Changed("list-microphones") &&
 			!cmd.Flags().Changed("list-hotkeys") &&
+			!cmd.Flags().Changed("list-sounds") &&
+			!cmd.Flags().Changed("test-sounds") &&
 			!cmd.Flags().Changed("set-microphone") &&
 			!cmd.Flags().Changed("set-model") &&
 			!cmd.Flags().Changed("set-language") &&
-			!cmd.Flags().Changed("set-hotkey") {
+			!cmd.Flags().Changed("set-hotkey") &&
+			!cmd.Flags().Changed("enable-audio-feedback") &&
+			!cmd.Flags().Changed("disable-audio-feedback") {
 			_ = cmd.Help()
 			return
 		}
@@ -42,6 +46,29 @@ var configCmd = &cobra.Command{
 		// Handle --list-hotkeys flag
 		if cmd.Flags().Changed("list-hotkeys") {
 			handleListHotkeys()
+			return
+		}
+
+		// Handle --list-sounds flag
+		if cmd.Flags().Changed("list-sounds") {
+			handleListSounds()
+			return
+		}
+
+		// Handle --test-sounds flag
+		if cmd.Flags().Changed("test-sounds") {
+			handleTestSounds()
+			return
+		}
+
+		// Handle audio feedback enable/disable
+		if cmd.Flags().Changed("enable-audio-feedback") {
+			handleSetAudioFeedback(true)
+			return
+		}
+
+		if cmd.Flags().Changed("disable-audio-feedback") {
+			handleSetAudioFeedback(false)
 			return
 		}
 
@@ -183,6 +210,88 @@ func handleSetConfig(key, value string) {
 	fmt.Println("Configuration saved successfully!")
 }
 
+func handleListSounds() {
+	sounds := audio.ListSystemSounds()
+	fmt.Println("Available macOS system sounds:")
+	for i, sound := range sounds {
+		fmt.Printf("  %d. %s\n", i+1, sound)
+	}
+	fmt.Println("\nOpenScribe uses the following sounds by default:")
+	fmt.Println("  - Start recording: Tink (short ascending beep)")
+	fmt.Println("  - Stop recording: Pop (short neutral beep)")
+	fmt.Println("  - Transcription complete: Glass (pleasant ding)")
+	fmt.Println("\nTo test the sounds, run:")
+	fmt.Println("  openscribe config --test-sounds")
+}
+
+func handleTestSounds() {
+	fmt.Println("Testing audio feedback sounds...")
+
+	feedback, err := audio.NewFeedback()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing audio feedback: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := feedback.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to close audio feedback: %v\n", err)
+		}
+	}()
+
+	fmt.Println("Playing start sound (Tink)...")
+	if err := feedback.PlayStartSound(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error playing start sound: %v\n", err)
+	}
+
+	// Brief pause between sounds
+	fmt.Println("Waiting 1 second...")
+	_ = os.Stdout.Sync()
+	// Use a simple busy-wait for demo purposes
+	for i := 0; i < 100000000; i++ {
+		_ = i // prevent empty block warning
+	}
+
+	fmt.Println("Playing stop sound (Pop)...")
+	if err := feedback.PlayStopSound(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error playing stop sound: %v\n", err)
+	}
+
+	fmt.Println("Waiting 1 second...")
+	_ = os.Stdout.Sync()
+	for i := 0; i < 100000000; i++ {
+		_ = i // prevent empty block warning
+	}
+
+	fmt.Println("Playing complete sound (Glass)...")
+	if err := feedback.PlayCompleteSound(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error playing complete sound: %v\n", err)
+	}
+
+	fmt.Println("\nAudio feedback test complete!")
+}
+
+func handleSetAudioFeedback(enabled bool) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.AudioFeedback = enabled
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if enabled {
+		fmt.Println("Audio feedback enabled!")
+	} else {
+		fmt.Println("Audio feedback disabled.")
+	}
+	fmt.Println("Configuration saved successfully!")
+}
+
 func init() {
 	rootCmd.AddCommand(configCmd)
 
@@ -190,6 +299,10 @@ func init() {
 	configCmd.Flags().Bool("show", false, "Display current configuration")
 	configCmd.Flags().Bool("list-microphones", false, "List available microphones")
 	configCmd.Flags().Bool("list-hotkeys", false, "List available hotkeys")
+	configCmd.Flags().Bool("list-sounds", false, "List available system sounds")
+	configCmd.Flags().Bool("test-sounds", false, "Test audio feedback sounds")
+	configCmd.Flags().Bool("enable-audio-feedback", false, "Enable audio feedback")
+	configCmd.Flags().Bool("disable-audio-feedback", false, "Disable audio feedback")
 	configCmd.Flags().String("set-microphone", "", "Set default microphone")
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")

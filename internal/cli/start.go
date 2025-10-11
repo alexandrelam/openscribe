@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/alexandrelam/openscribe/internal/hotkey"
 	"github.com/spf13/cobra"
@@ -67,6 +68,23 @@ func runStart(cmd *cobra.Command) {
 	fmt.Printf("  Audio Feedback:  %t\n", cfg.AudioFeedback)
 	fmt.Println()
 
+	// Initialize audio feedback if enabled
+	var feedback audio.Feedback
+	if cfg.AudioFeedback {
+		var err error
+		feedback, err = audio.NewFeedback()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to initialize audio feedback: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Continuing without audio feedback...\n\n")
+		} else {
+			defer func() {
+				if err := feedback.Close(); err != nil && cfg.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to close audio feedback: %v\n", err)
+				}
+			}()
+		}
+	}
+
 	// State management
 	var (
 		mu          sync.Mutex
@@ -82,12 +100,36 @@ func runStart(cmd *cobra.Command) {
 			// Start recording
 			isRecording = true
 			fmt.Println("🔴 Recording started... (double-press hotkey again to stop)")
+
+			// Play start sound
+			if feedback != nil {
+				if err := feedback.PlayStartSound(); err != nil && cfg.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to play start sound: %v\n", err)
+				}
+			}
+
 			// TODO: Start actual audio recording in Phase 10
 		} else {
 			// Stop recording
 			isRecording = false
 			fmt.Println("⏹  Recording stopped. Transcribing...")
+
+			// Play stop sound
+			if feedback != nil {
+				if err := feedback.PlayStopSound(); err != nil && cfg.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to play stop sound: %v\n", err)
+				}
+			}
+
 			// TODO: Stop recording and transcribe in Phase 10
+
+			// Play complete sound when transcription is done
+			if feedback != nil {
+				if err := feedback.PlayCompleteSound(); err != nil && cfg.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to play complete sound: %v\n", err)
+				}
+			}
+
 			fmt.Println("✅ Transcription complete!")
 		}
 	}
