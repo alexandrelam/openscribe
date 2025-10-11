@@ -5,62 +5,122 @@ package hotkey
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework Cocoa -framework Carbon
+#cgo LDFLAGS: -framework Cocoa -framework CoreGraphics -framework ApplicationServices
 
 #import <Cocoa/Cocoa.h>
-#import <Carbon/Carbon.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <ApplicationServices/ApplicationServices.h>
 
 // Global variable to store the Go callback
 extern void goHotkeyCallback(void);
 
 // Global variables for event handling
-static EventHotKeyRef gHotKeyRef = NULL;
-static EventHandlerRef gHandlerRef = NULL;
+static CFMachPortRef gEventTap = NULL;
+static CFRunLoopSourceRef gRunLoopSource = NULL;
 static CFRunLoopRef gRunLoop = NULL;
+static uint16_t gTargetKeyCode = 0;
 
-// Event handler for key events
-static OSStatus keyEventHandler(EventHandlerCallRef nextHandler, EventRef theEvent, void* userData) {
-    EventHotKeyID hotKeyID;
-    GetEventParameter(theEvent, kEventParamDirectObject, typeEventHotKeyID, NULL, sizeof(hotKeyID), NULL, &hotKeyID);
-
-    // Call the Go callback
-    goHotkeyCallback();
-
-    return noErr;
-}
-
-// Register a hotkey with the system
-static int registerHotkey(UInt32 keyCode) {
-    EventTypeSpec eventType;
-    eventType.eventClass = kEventClassKeyboard;
-    eventType.eventKind = kEventHotKeyPressed;
-
-    // Install the event handler
-    OSStatus status = InstallEventHandler(GetApplicationEventTarget(),
-                                         &keyEventHandler,
-                                         1,
-                                         &eventType,
-                                         NULL,
-                                         &gHandlerRef);
-    if (status != noErr) {
-        return -1;
+// Event tap callback for monitoring keyboard events
+static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+    // Handle tap disabled event
+    if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
+        if (gEventTap != NULL) {
+            CGEventTapEnable(gEventTap, true);
+        }
+        return event;
     }
 
-    // Register the hotkey (no modifiers, just the key itself)
-    EventHotKeyID hotKeyID;
-    hotKeyID.signature = 'htk1';
-    hotKeyID.id = 1;
+    // Only process key down events for flags changed (modifier keys)
+    if (type == kCGEventFlagsChanged) {
+        // Get the key code from the event
+        int64_t keyCode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
 
-    status = RegisterEventHotKey(keyCode,
-                                0,  // No modifiers
-                                hotKeyID,
-                                GetApplicationEventTarget(),
-                                0,
-                                &gHotKeyRef);
-    if (status != noErr) {
-        RemoveEventHandler(gHandlerRef);
-        gHandlerRef = NULL;
-        return -2;
+        // Get the current flags to determine if key was pressed or released
+        CGEventFlags flags = CGEventGetFlags(event);
+
+        // Check if this is our target key and if it was just pressed
+        // We detect a press by checking if any modifier flag is set
+        // (when released, the flags will be clear)
+        if (keyCode == gTargetKeyCode) {
+            // Determine if key was pressed by checking relevant modifier flags
+            bool isPressed = false;
+
+            // Map key codes to their corresponding modifier flags
+            switch (keyCode) {
+                case 0x3D: // Right Option
+                case 0x3A: // Left Option
+                    isPressed = (flags & kCGEventFlagMaskAlternate) != 0;
+                    break;
+                case 0x3C: // Right Shift
+                case 0x38: // Left Shift
+                    isPressed = (flags & kCGEventFlagMaskShift) != 0;
+                    break;
+                case 0x36: // Right Command
+                case 0x37: // Left Command
+                    isPressed = (flags & kCGEventFlagMaskCommand) != 0;
+                    break;
+                case 0x3E: // Right Control
+                case 0x3B: // Left Control
+                    isPressed = (flags & kCGEventFlagMaskControl) != 0;
+                    break;
+            }
+
+            // Only trigger callback on key press (not release)
+            if (isPressed) {
+                goHotkeyCallback();
+            }
+        }
+    }
+
+    // Pass through the event
+    return event;
+}
+
+// Check if we have accessibility permissions
+static int checkAccessibilityPermissions() {
+    NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt: @NO};
+    Boolean isTrusted = AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+    return isTrusted ? 1 : 0;
+}
+
+// Request accessibility permissions with prompt
+static void requestAccessibilityPermissions() {
+    NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
+    AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+}
+
+// Register a hotkey with the system using CGEventTap
+static int registerHotkey(uint16_t keyCode) {
+    // Check accessibility permissions first
+    if (checkAccessibilityPermissions() == 0) {
+        return -1; // No accessibility permissions
+    }
+
+    // Store the target key code
+    gTargetKeyCode = keyCode;
+
+    // Create an event tap to monitor flags changed events (for modifier keys)
+    CGEventMask eventMask = CGEventMaskBit(kCGEventFlagsChanged);
+
+    gEventTap = CGEventTapCreate(
+        kCGSessionEventTap,
+        kCGHeadInsertEventTap,
+        kCGEventTapOptionDefault,
+        eventMask,
+        eventTapCallback,
+        NULL
+    );
+
+    if (gEventTap == NULL) {
+        return -2; // Failed to create event tap
+    }
+
+    // Create a run loop source and add it to the current run loop
+    gRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, gEventTap, 0);
+    if (gRunLoopSource == NULL) {
+        CFRelease(gEventTap);
+        gEventTap = NULL;
+        return -3; // Failed to create run loop source
     }
 
     return 0;
@@ -68,20 +128,36 @@ static int registerHotkey(UInt32 keyCode) {
 
 // Unregister the hotkey
 static void unregisterHotkey() {
-    if (gHotKeyRef != NULL) {
-        UnregisterEventHotKey(gHotKeyRef);
-        gHotKeyRef = NULL;
+    if (gRunLoopSource != NULL && gRunLoop != NULL) {
+        CFRunLoopRemoveSource(gRunLoop, gRunLoopSource, kCFRunLoopCommonModes);
+        CFRelease(gRunLoopSource);
+        gRunLoopSource = NULL;
     }
-    if (gHandlerRef != NULL) {
-        RemoveEventHandler(gHandlerRef);
-        gHandlerRef = NULL;
+
+    if (gEventTap != NULL) {
+        CGEventTapEnable(gEventTap, false);
+        CFRelease(gEventTap);
+        gEventTap = NULL;
     }
+
+    gTargetKeyCode = 0;
 }
 
 // Start the event loop in a separate thread
 static void* runEventLoop(void* arg) {
     @autoreleasepool {
         gRunLoop = CFRunLoopGetCurrent();
+
+        // Add the run loop source if we have one
+        if (gRunLoopSource != NULL) {
+            CFRunLoopAddSource(gRunLoop, gRunLoopSource, kCFRunLoopCommonModes);
+
+            // Enable the event tap
+            if (gEventTap != NULL) {
+                CGEventTapEnable(gEventTap, true);
+            }
+        }
+
         CFRunLoopRun();
     }
     return NULL;
@@ -120,8 +196,16 @@ func (l *Listener) startEventMonitor() error {
 	currentListener = l
 
 	// Register the hotkey
-	result := C.registerHotkey(C.UInt32(l.keyCode))
-	if result != 0 {
+	result := C.registerHotkey(C.uint16_t(l.keyCode))
+	if result == -1 {
+		// Request accessibility permissions
+		C.requestAccessibilityPermissions()
+		return fmt.Errorf("accessibility permissions required: please grant permissions in System Preferences > Security & Privacy > Privacy > Accessibility, then restart OpenScribe")
+	} else if result == -2 {
+		return fmt.Errorf("failed to create event tap for hotkey monitoring")
+	} else if result == -3 {
+		return fmt.Errorf("failed to create run loop source for hotkey monitoring")
+	} else if result != 0 {
 		return fmt.Errorf("failed to register hotkey (error code: %d)", result)
 	}
 
