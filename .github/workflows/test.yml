@@ -24,8 +24,7 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v2.5.0
-          install-mode: goinstall
+          version: latest
 
       - name: Run tests
         env:
