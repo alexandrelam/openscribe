@@ -83,21 +83,45 @@ brew install whisper-cpp
 
 ### Step 2: Install OpenScribe
 
-**Option A: From Source** (recommended for development)
+**Option A: Via Homebrew** (recommended)
+
+```bash
+# Tap the OpenScribe repository
+brew tap alexandrelam/openscribe
+
+# Install OpenScribe
+brew install openscribe
+```
+
+**Option B: From Source** (for development)
 
 ```bash
 # Clone the repository
-git clone https://github.com/alexandrelam/openscribe-go.git
-cd openscribe-go
+git clone https://github.com/alexandrelam/openscribe.git
+cd openscribe
 
 # Build and install
 make build
 make install
 ```
 
-**Option B: Download Binary** (coming soon)
+**Option C: Download Binary**
 
-Pre-built binaries will be available in the [Releases](https://github.com/alexandrelam/openscribe-go/releases) section.
+Pre-built binaries are available in the [Releases](https://github.com/alexandrelam/openscribe/releases) section:
+
+```bash
+# Download the latest release for your architecture
+# For Apple Silicon (M1/M2/M3):
+curl -L https://github.com/alexandrelam/openscribe/releases/latest/download/openscribe-darwin-arm64.tar.gz -o openscribe.tar.gz
+
+# For Intel Macs:
+curl -L https://github.com/alexandrelam/openscribe/releases/latest/download/openscribe-darwin-amd64.tar.gz -o openscribe.tar.gz
+
+# Extract and install
+tar -xzf openscribe.tar.gz
+sudo mv openscribe-darwin-* /usr/local/bin/openscribe
+chmod +x /usr/local/bin/openscribe
+```
 
 ### Step 3: First-Time Setup
 
