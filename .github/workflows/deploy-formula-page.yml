@@ -62,7 +62,8 @@ jobs:
             hasDeps: (formula.dependencies?.length > 0) || (formula.build_dependencies?.length > 0),
             bottles: Object.keys(formula.bottle?.stable?.files || {}),
             hasBottles: Object.keys(formula.bottle?.stable?.files || {}).length > 0,
-            installCommand: 'brew tap alexandrelam/openscribe\nbrew install openscribe',
+            installCommand: `brew tap alexandrelam/openscribe
+brew install openscribe`,
             githubUrl: formula.homepage,
             year: new Date().getFullYear()
           };
