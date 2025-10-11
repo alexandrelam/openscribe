@@ -73,55 +73,63 @@
 
 - **macOS** on Apple Silicon (M1/M2/M3/M4) - ARM64 only
 - **Homebrew** package manager
-- **whisper-cpp** for transcription engine
 
 > **Note:** OpenScribe currently only supports Apple Silicon Macs (M1/M2/M3/M4). Intel Macs are not supported.
 
-### Step 1: Install whisper-cpp
+### Quick Install (Recommended)
+
+Install OpenScribe via Homebrew in just two commands:
 
 ```bash
-brew install whisper-cpp
-```
-
-### Step 2: Install OpenScribe
-
-**Option A: Via Homebrew** (recommended)
-
-```bash
-# Tap the OpenScribe repository
+# Tap the OpenScribe repository and install
 brew tap alexandrelam/openscribe
-
-# Install OpenScribe
 brew install openscribe
 ```
 
-**Option B: From Source** (for development)
+This will automatically:
+- ✅ Install OpenScribe
+- ✅ Install whisper-cpp dependency
+- ✅ Set up all required paths
+
+### Alternative Installation Methods
+
+<details>
+<summary><b>Option B: From Source</b> (for development)</summary>
 
 ```bash
 # Clone the repository
-git clone https://github.com/alexandrelam/openscribe.git
-cd openscribe
+git clone https://github.com/alexandrelam/openscribe-go.git
+cd openscribe-go
+
+# Install whisper-cpp dependency
+brew install whisper-cpp
 
 # Build and install
 make build
 make install
 ```
+</details>
 
-**Option C: Download Binary**
+<details>
+<summary><b>Option C: Download Binary</b> (manual installation)</summary>
 
-Pre-built binaries for Apple Silicon are available in the [Releases](https://github.com/alexandrelam/openscribe/releases) section:
+Pre-built binaries for Apple Silicon are available in the [Releases](https://github.com/alexandrelam/openscribe-go/releases) section:
 
 ```bash
+# Install whisper-cpp dependency
+brew install whisper-cpp
+
 # Download the latest release for Apple Silicon (M1/M2/M3/M4)
-curl -L https://github.com/alexandrelam/openscribe/releases/latest/download/openscribe-darwin-arm64.tar.gz -o openscribe.tar.gz
+curl -L https://github.com/alexandrelam/openscribe-go/releases/latest/download/openscribe-darwin-arm64.tar.gz -o openscribe.tar.gz
 
 # Extract and install
 tar -xzf openscribe.tar.gz
-sudo mv openscribe-darwin-arm64 /usr/local/bin/openscribe
+sudo mv openscribe /usr/local/bin/openscribe
 chmod +x /usr/local/bin/openscribe
 ```
+</details>
 
-### Step 3: First-Time Setup
+### First-Time Setup
 
 Run the setup command to download the default Whisper model:
 
@@ -135,7 +143,7 @@ This will:
 - Create configuration directories
 - Set up default preferences
 
-### Step 4: Grant Permissions
+### Grant Permissions
 
 OpenScribe requires two macOS permissions:
 
