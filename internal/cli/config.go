@@ -6,6 +6,7 @@ import (
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
+	"github.com/alexandrelam/openscribe/internal/hotkey"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,7 @@ var configCmd = &cobra.Command{
 		// If no flags are provided, show help
 		if !cmd.Flags().Changed("show") &&
 			!cmd.Flags().Changed("list-microphones") &&
+			!cmd.Flags().Changed("list-hotkeys") &&
 			!cmd.Flags().Changed("set-microphone") &&
 			!cmd.Flags().Changed("set-model") &&
 			!cmd.Flags().Changed("set-language") &&
@@ -34,6 +36,12 @@ var configCmd = &cobra.Command{
 		// Handle --list-microphones flag
 		if cmd.Flags().Changed("list-microphones") {
 			handleListMicrophones()
+			return
+		}
+
+		// Handle --list-hotkeys flag
+		if cmd.Flags().Changed("list-hotkeys") {
+			handleListHotkeys()
 			return
 		}
 
@@ -102,6 +110,18 @@ func handleListMicrophones() {
 	fmt.Println("  openscribe config --set-microphone \"<microphone name>\"")
 }
 
+func handleListHotkeys() {
+	fmt.Println("Available hotkeys:")
+
+	keys := hotkey.GetAvailableKeys()
+	for i, key := range keys {
+		fmt.Printf("  %d. %s\n", i+1, key)
+	}
+
+	fmt.Println("\nTo set a hotkey, use:")
+	fmt.Println("  openscribe config --set-hotkey \"Right Option\"")
+}
+
 func handleSetConfig(key, value string) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -138,6 +158,12 @@ func handleSetConfig(key, value string) {
 			fmt.Printf("Language set to: %s\n", value)
 		}
 	case "hotkey":
+		// Validate hotkey
+		if err := hotkey.ValidateKeyName(value); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Println("\nRun 'openscribe config --list-hotkeys' to see available hotkeys.")
+			os.Exit(1)
+		}
 		cfg.Hotkey = value
 		fmt.Printf("Hotkey set to: %s\n", value)
 	}
@@ -163,6 +189,7 @@ func init() {
 	// Add flags for the config command
 	configCmd.Flags().Bool("show", false, "Display current configuration")
 	configCmd.Flags().Bool("list-microphones", false, "List available microphones")
+	configCmd.Flags().Bool("list-hotkeys", false, "List available hotkeys")
 	configCmd.Flags().String("set-microphone", "", "Set default microphone")
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")

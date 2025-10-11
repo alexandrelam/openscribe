@@ -130,7 +130,7 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 
 ---
 
-## Phase 7: Hotkey Detection & Event Loop
+## Phase 7: Hotkey Detection & Event Loop ✅
 
 **Goal**: Implement global hotkey listener for macOS
 
@@ -146,6 +146,21 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 **Why this grouping**: Hotkey detection is a complex system integration piece. It's isolated from audio/transcription but requires macOS-specific code.
 
 **Test**: Run a test mode that prints "Hotkey detected!" when double-press occurs. Verify Ctrl+C exits cleanly.
+
+**Implementation Notes**:
+- Created `internal/hotkey` package with platform-specific macOS implementation
+- Uses Carbon Event Manager API for global hotkey registration
+- Double-press detection with configurable 500ms window
+- Supports 8 common modifier keys (Option, Shift, Cmd, Ctrl - left and right)
+- Added `--list-hotkeys` flag to config command
+- Integrated hotkey listener into `openscribe start` command with proper signal handling
+- All C functions marked as `static` to avoid duplicate symbol linker errors
+
+**Testing**:
+- Run `openscribe config --list-hotkeys` to see available hotkeys
+- Run `openscribe config --set-hotkey "Right Option"` to configure hotkey
+- Run `openscribe start` to test hotkey detection (requires Accessibility permissions)
+- Note: Actual hotkey detection requires macOS Accessibility permissions to be granted
 
 ---
 
@@ -333,7 +348,7 @@ Phase 13 (Distribution)
 - [x] Phase 4: Can list and select microphones
 - [x] Phase 5: Can transcribe a test audio file
 - [x] Phase 6: Can view logs with `openscribe logs show`
-- [ ] Phase 7: Can detect hotkey double-press
+- [x] Phase 7: Can detect hotkey double-press
 - [ ] Phase 8: Can hear feedback sounds
 - [ ] Phase 9: Can auto-paste text at cursor
 - [ ] Phase 10: Full flow works end-to-end
