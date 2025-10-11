@@ -97,7 +97,8 @@ func handleListMicrophones() {
 		fmt.Printf("  %d. %s%s\n", i+1, device.Name, defaultMarker)
 	}
 
-	fmt.Println("\nTo set a microphone, use:")
+	fmt.Println("\nTo set a microphone, use either the number or name:")
+	fmt.Println("  openscribe config --set-microphone 1")
 	fmt.Println("  openscribe config --set-microphone \"<microphone name>\"")
 }
 
@@ -113,18 +114,18 @@ func handleSetConfig(key, value string) {
 	case "microphone":
 		// Validate that the microphone exists
 		if value != "" {
-			_, err := audio.FindMicrophoneByName(value)
+			device, err := audio.FindMicrophoneByNameOrIndex(value)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				fmt.Println("\nRun 'openscribe config --list-microphones' to see available devices.")
 				os.Exit(1)
 			}
-		}
-		cfg.Microphone = value
-		if value == "" {
-			fmt.Println("Microphone set to: (system default)")
+			// Store the actual device name (not the index)
+			cfg.Microphone = device.Name
+			fmt.Printf("Microphone set to: %s\n", device.Name)
 		} else {
-			fmt.Printf("Microphone set to: %s\n", value)
+			cfg.Microphone = value
+			fmt.Println("Microphone set to: (system default)")
 		}
 	case "model":
 		cfg.Model = value
