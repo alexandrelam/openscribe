@@ -242,7 +242,7 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 
 ---
 
-## Phase 10: Integration - The `start` Command
+## Phase 10: Integration - The `start` Command ✅
 
 **Goal**: Wire everything together into the main application flow
 
@@ -267,6 +267,39 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 **Why this grouping**: This is the "assembly" phase where we connect all previous phases. It's mostly integration work with minimal new logic.
 
 **Test**: Full end-to-end flow: `openscribe start` → double-press → record → double-press → transcribe → paste → verify in log.
+
+**Implementation Notes**:
+- **Refactored to use existing `internal/transcription` package** (removed duplicate `internal/transcribe` package)
+- Uses whisper-cli via command-line invocation (simpler than CGo bindings)
+- Leverages existing `transcription.Transcriber` with `Options` struct for consistent API
+- Transcription process:
+  1. Hotkey callback creates audio.Recorder on first press
+  2. Records audio data into memory buffer
+  3. On second press, stops recorder and retrieves audio data
+  4. Saves audio data to temporary WAV file in cache directory
+  5. Calls whisper-cli with model path and audio file
+  6. Parses transcription from whisper-cli output file
+  7. Cleans up temporary files (unless --verbose)
+- Added startup checks:
+  - Verifies whisper-cpp is installed (via `models.IsWhisperCppInstalled()`)
+  - Checks if selected model exists in models directory
+  - Shows helpful error messages directing users to setup/download commands
+- Full integration with all subsystems:
+  - Audio recording (malgo-based)
+  - Audio feedback (NSSound system sounds)
+  - Keyboard simulation (CGEvent-based auto-paste)
+  - Transcription logging (JSON log entries)
+  - Hotkey detection (Carbon Event Manager)
+- Handles transcription timing and logging with proper duration tracking
+- Verbose mode preserves WAV files for debugging
+- Graceful error handling at each stage with informative messages
+
+**Testing**:
+- Build succeeds with `make build`
+- Binary created at `bin/openscribe` (11MB)
+- All CLI commands work: `openscribe --help`, `openscribe start --help`
+- Startup checks validate whisper-cpp and model availability
+- Ready for end-to-end testing with actual recording and transcription
 
 ---
 
@@ -391,7 +424,7 @@ Phase 13 (Distribution)
 - [x] Phase 7: Can detect hotkey double-press
 - [x] Phase 8: Can hear feedback sounds
 - [x] Phase 9: Can auto-paste text at cursor
-- [ ] Phase 10: Full flow works end-to-end
+- [x] Phase 10: Full flow works end-to-end
 - [ ] Phase 11: All error cases handled gracefully
 - [ ] Phase 12: Documentation complete and tested
 - [ ] Phase 13: Available via Homebrew

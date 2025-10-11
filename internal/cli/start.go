@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/alexandrelam/openscribe/internal/hotkey"
 	"github.com/alexandrelam/openscribe/internal/keyboard"
+	"github.com/alexandrelam/openscribe/internal/logging"
+	"github.com/alexandrelam/openscribe/internal/models"
+	"github.com/alexandrelam/openscribe/internal/transcription"
 	"github.com/spf13/cobra"
 )
 
@@ -48,6 +53,37 @@ func runStart(cmd *cobra.Command) {
 	}
 	if cmd.Flags().Changed("verbose") {
 		cfg.Verbose, _ = cmd.Flags().GetBool("verbose")
+	}
+
+	// Parse model size
+	modelSize, err := models.ParseModelSize(cfg.Model)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Invalid model '%s': %v\n", cfg.Model, err)
+		os.Exit(1)
+	}
+
+	// Check if model is downloaded
+	isDownloaded, err := models.IsModelDownloaded(modelSize)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking if model is downloaded: %v\n", err)
+		os.Exit(1)
+	}
+	if !isDownloaded {
+		fmt.Fprintf(os.Stderr, "⚠️  Model '%s' is not downloaded!\n\n", cfg.Model)
+		fmt.Fprintf(os.Stderr, "Please run setup to download a model:\n")
+		fmt.Fprintf(os.Stderr, "  $ openscribe setup\n\n")
+		fmt.Fprintf(os.Stderr, "Or download a specific model:\n")
+		fmt.Fprintf(os.Stderr, "  $ openscribe models download %s\n\n", cfg.Model)
+		os.Exit(1)
+	}
+
+	// Create transcriber
+	transcriber, err := transcription.NewTranscriber()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: whisper-cpp is not installed.\n\n")
+		fmt.Fprintf(os.Stderr, "Please install whisper.cpp via Homebrew:\n")
+		fmt.Fprintf(os.Stderr, "  brew install whisper-cpp\n\n")
+		os.Exit(1)
 	}
 
 	// Display current configuration
@@ -123,6 +159,8 @@ func runStart(cmd *cobra.Command) {
 	var (
 		mu          sync.Mutex
 		isRecording bool
+		recorder    *audio.Recorder
+		recordStart time.Time
 	)
 
 	// Create hotkey callback
@@ -133,6 +171,7 @@ func runStart(cmd *cobra.Command) {
 		if !isRecording {
 			// Start recording
 			isRecording = true
+			recordStart = time.Now()
 			fmt.Println("🔴 Recording started... (double-press hotkey again to stop)")
 
 			// Play start sound
@@ -142,10 +181,17 @@ func runStart(cmd *cobra.Command) {
 				}
 			}
 
-			// TODO: Start actual audio recording in Phase 10
+			// Create and start recorder
+			recorder = audio.NewRecorder(cfg.Microphone)
+			if err := recorder.Start(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error starting recording: %v\n", err)
+				isRecording = false
+				return
+			}
 		} else {
 			// Stop recording
 			isRecording = false
+			recordDuration := time.Since(recordStart).Seconds()
 			fmt.Println("⏹  Recording stopped. Transcribing...")
 
 			// Play stop sound
@@ -155,9 +201,62 @@ func runStart(cmd *cobra.Command) {
 				}
 			}
 
-			// TODO: Stop recording and transcribe in Phase 10
-			// For now, we'll use a sample transcription for testing
-			sampleTranscription := "Hello, this is a test of the OpenScribe application."
+			// Stop recorder and get audio data
+			audioData, err := recorder.Stop()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error stopping recording: %v\n", err)
+				return
+			}
+
+			if len(audioData) == 0 {
+				fmt.Fprintf(os.Stderr, "Warning: No audio data captured\n")
+				return
+			}
+
+			// Save audio to temporary WAV file
+			cacheDir, err := config.GetCacheDir()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error getting cache directory: %v\n", err)
+				return
+			}
+
+			// Ensure cache directory exists
+			if err := os.MkdirAll(cacheDir, 0755); err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating cache directory: %v\n", err)
+				return
+			}
+
+			// Create temporary WAV file
+			timestamp := time.Now().Format("20060102_150405")
+			wavPath := filepath.Join(cacheDir, fmt.Sprintf("recording_%s.wav", timestamp))
+
+			if err := audio.SaveWAV(wavPath, audioData, recorder.GetSampleRate(), recorder.GetChannels()); err != nil {
+				fmt.Fprintf(os.Stderr, "Error saving audio file: %v\n", err)
+				return
+			}
+
+			if cfg.Verbose {
+				fmt.Printf("Audio saved to: %s\n", wavPath)
+			}
+
+			// Transcribe audio
+			opts := transcription.Options{
+				Model:    modelSize,
+				Language: cfg.Language,
+				Verbose:  cfg.Verbose,
+			}
+			result, err := transcriber.TranscribeFile(wavPath, opts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error transcribing audio: %v\n", err)
+				// Clean up WAV file
+				_ = os.Remove(wavPath)
+				return
+			}
+
+			// Clean up WAV file (unless verbose mode)
+			if !cfg.Verbose {
+				_ = os.Remove(wavPath)
+			}
 
 			// Play complete sound when transcription is done
 			if feedback != nil {
@@ -166,11 +265,17 @@ func runStart(cmd *cobra.Command) {
 				}
 			}
 
-			fmt.Printf("Transcription: \"%s\"\n", sampleTranscription)
+			transcription := result.Text
+			if transcription == "" {
+				fmt.Println("⚠️  No speech detected in recording")
+				return
+			}
+
+			fmt.Printf("Transcription: \"%s\"\n", transcription)
 
 			// Auto-paste if enabled
 			if cfg.AutoPaste && kb != nil {
-				if err := kb.TypeText(sampleTranscription); err != nil {
+				if err := kb.TypeText(transcription); err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: Failed to paste text: %v\n", err)
 				} else {
 					fmt.Println("✅ Text pasted to cursor position!")
@@ -179,7 +284,16 @@ func runStart(cmd *cobra.Command) {
 				fmt.Println("✅ Transcription complete!")
 			}
 
-			// TODO: Log transcription in Phase 10
+			// Log transcription
+			if err := logging.LogTranscription(recordDuration, cfg.Model, result.Language, transcription); err != nil {
+				if cfg.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to log transcription: %v\n", err)
+				}
+			} else {
+				logPath, _ := config.GetTranscriptionLogPath()
+				timestamp := time.Now().Format("2006-01-02 15:04:05")
+				fmt.Printf("\n[%s] Logged to %s\n", timestamp, logPath)
+			}
 		}
 	}
 
