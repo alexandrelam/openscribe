@@ -88,7 +88,7 @@ func (r *Recorder) Start() error {
 	r.audioDataMutex.Unlock()
 
 	// Callback to capture audio data
-	onRecvFrames := func(pSample2, pSample []byte, framecount uint32) {
+	onRecvFrames := func(_, pSample []byte, _ uint32) {
 		r.audioDataMutex.Lock()
 		r.audioData = append(r.audioData, pSample...)
 		r.audioDataMutex.Unlock()

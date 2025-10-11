@@ -14,6 +14,7 @@ import (
 // ModelSize represents a Whisper model size
 type ModelSize string
 
+// Available Whisper model sizes
 const (
 	Tiny   ModelSize = "tiny"
 	Base   ModelSize = "base"
@@ -165,7 +166,9 @@ func verifyChecksum(filePath, expectedChecksum string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Read-only operation, error not critical
+	}()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {

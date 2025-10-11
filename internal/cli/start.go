@@ -17,7 +17,7 @@ var startCmd = &cobra.Command{
 	Short: "Start the OpenScribe service",
 	Long: `Start OpenScribe and begin listening for hotkey activation.
 Once started, press the configured hotkey (default: Right Option) twice to start/stop recording.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		runStart(cmd)
 	},
 }
@@ -69,7 +69,7 @@ func runStart(cmd *cobra.Command) {
 
 	// State management
 	var (
-		mu         sync.Mutex
+		mu          sync.Mutex
 		isRecording bool
 	)
 

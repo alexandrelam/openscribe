@@ -2,22 +2,11 @@ package logging
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/alexandrelam/openscribe/internal/config"
 )
-
-func setupTestLogDir(t *testing.T) string {
-	// Create a temporary directory for testing
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "transcriptions.log")
-
-	// Override the GetTranscriptionLogPath function for testing
-	// We'll manually manage the log path in tests
-	return logPath
-}
 
 func TestLogTranscription(t *testing.T) {
 	// Create a test log entry

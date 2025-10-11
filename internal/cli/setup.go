@@ -19,7 +19,7 @@ This command will:
   - Compile whisper.cpp if needed
   - Download the default small model
   - Create necessary configuration directories`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		runSetup()
 	},
 }

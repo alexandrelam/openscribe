@@ -26,7 +26,7 @@ func IsWhisperCppInstalled() (bool, error) {
 // CheckHomebrew checks if Homebrew is installed
 func CheckHomebrew() error {
 	if _, err := exec.LookPath("brew"); err != nil {
-		return fmt.Errorf("Homebrew is not installed. Install it from: https://brew.sh")
+		return fmt.Errorf("homebrew is not installed. Install it from: https://brew.sh")
 	}
 	return nil
 }

@@ -37,7 +37,7 @@ func init() {
 	rootCmd.AddCommand(transcribeCmd)
 }
 
-func runTranscribe(cmd *cobra.Command, args []string) error {
+func runTranscribe(_ *cobra.Command, args []string) error {
 	audioPath := args[0]
 
 	// Check if file exists

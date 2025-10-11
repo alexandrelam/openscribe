@@ -29,7 +29,11 @@ func SaveWAV(filename string, audioData []byte, sampleRate, channels uint32) err
 	if err != nil {
 		return fmt.Errorf("failed to create WAV file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close WAV file: %w", closeErr)
+		}
+	}()
 
 	bitsPerSample := uint16(16) // 16-bit audio
 	byteRate := sampleRate * uint32(channels) * uint32(bitsPerSample) / 8
@@ -72,7 +76,9 @@ func LoadWAV(filename string) ([]byte, uint32, uint32, error) {
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("failed to open WAV file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Read-only operation, error not critical
+	}()
 
 	// Read header
 	var header WAVHeader

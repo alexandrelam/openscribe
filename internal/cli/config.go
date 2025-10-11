@@ -14,7 +14,7 @@ var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Configuration management",
 	Long:  `View and modify OpenScribe configuration settings.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		// If no flags are provided, show help
 		if !cmd.Flags().Changed("show") &&
 			!cmd.Flags().Changed("list-microphones") &&

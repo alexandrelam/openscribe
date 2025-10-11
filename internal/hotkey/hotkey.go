@@ -1,3 +1,4 @@
+// Package hotkey provides global hotkey monitoring and double-press detection.
 package hotkey
 
 import (

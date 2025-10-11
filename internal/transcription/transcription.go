@@ -1,3 +1,4 @@
+// Package transcription provides speech-to-text transcription using whisper.cpp.
 package transcription
 
 import (

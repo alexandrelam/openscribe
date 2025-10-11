@@ -1,3 +1,4 @@
+// Package cli provides the command-line interface for OpenScribe.
 package cli
 
 import (

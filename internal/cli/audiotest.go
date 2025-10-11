@@ -16,7 +16,7 @@ var audioTestCmd = &cobra.Command{
 	Short:  "Test audio recording (records 5 seconds)",
 	Long:   `Test command to verify microphone and audio recording functionality. Records 5 seconds of audio and saves it to the cache directory.`,
 	Hidden: true, // Hidden command for testing purposes
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		duration, _ := cmd.Flags().GetInt("duration")
 		runAudioTest(duration)
 	},

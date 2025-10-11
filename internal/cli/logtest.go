@@ -11,7 +11,7 @@ var logtestCmd = &cobra.Command{
 	Use:    "logtest",
 	Short:  "Test logging functionality (for development)",
 	Hidden: true, // Hide from main help
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println("Creating test transcription logs...")
 
 		testEntries := []struct {

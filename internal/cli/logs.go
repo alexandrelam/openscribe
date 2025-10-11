@@ -19,7 +19,7 @@ var logsShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Display recent transcription logs",
 	Long:  `Show recent transcription logs from the log file.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		tail, _ := cmd.Flags().GetInt("tail")
 
 		// Get transcription entries
@@ -67,7 +67,7 @@ var logsClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear transcription logs",
 	Long:  `Delete all transcription logs.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		// Get count before clearing
 		count, err := logging.CountTranscriptions()
 		if err != nil {

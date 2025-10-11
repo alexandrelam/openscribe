@@ -1,3 +1,4 @@
+// Package logging provides transcription logging functionality.
 package logging
 
 import (
@@ -46,7 +47,11 @@ func LogTranscription(duration float64, model, language, text string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close log file: %w", closeErr)
+		}
+	}()
 
 	// Marshal to JSON
 	jsonData, err := json.Marshal(entry)
@@ -79,7 +84,9 @@ func GetTranscriptions(tail int) ([]TranscriptionEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Read-only operation, error not critical
+	}()
 
 	// Read all lines
 	var entries []TranscriptionEntry

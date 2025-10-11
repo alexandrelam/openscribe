@@ -46,7 +46,7 @@ func NewMockDeviceInfo(name string, isDefault bool) DeviceInfo {
 // CreateMockEnumerator creates a mock enumerator with predefined devices
 func CreateMockEnumerator(devices []DeviceInfo, err error) *MockDeviceEnumerator {
 	return &MockDeviceEnumerator{
-		DevicesFunc: func(deviceType malgo.DeviceType) ([]DeviceInfo, error) {
+		DevicesFunc: func(_ malgo.DeviceType) ([]DeviceInfo, error) {
 			return devices, err
 		},
 	}

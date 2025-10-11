@@ -19,7 +19,7 @@ var modelsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List available and downloaded models",
 	Long:  `Display all available Whisper models and indicate which are downloaded.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		listModels()
 	},
 }
@@ -29,7 +29,7 @@ var modelsDownloadCmd = &cobra.Command{
 	Short: "Download a specific Whisper model",
 	Long:  `Download a specific Whisper model (tiny, base, small, medium, large).`,
 	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		if len(args) == 0 {
 			fmt.Println("Please specify a model to download (tiny, base, small, medium, large)")
 			fmt.Println("\nExample: openscribe models download small")

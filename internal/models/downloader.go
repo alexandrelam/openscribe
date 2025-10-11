@@ -1,3 +1,4 @@
+// Package models provides Whisper model management and downloading functionality.
 package models
 
 import (
@@ -45,7 +46,9 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 	if err != nil {
 		return fmt.Errorf("failed to download model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Best effort close
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download model: HTTP %d", resp.StatusCode)
@@ -56,7 +59,9 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close() // Will be closed explicitly before rename
+	}()
 
 	// Get the total size
 	totalSize := resp.ContentLength
@@ -71,22 +76,25 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 	// Copy with progress
 	_, err = io.Copy(out, reader)
 	if err != nil {
-		os.Remove(tempFile) // Clean up on error
+		_ = os.Remove(tempFile) // Clean up on error
 		return fmt.Errorf("failed to write model file: %w", err)
 	}
 
 	// Close the file before renaming
-	out.Close()
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tempFile) // Clean up on error
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
 
 	// Move temp file to final location
 	if err := os.Rename(tempFile, finalPath); err != nil {
-		os.Remove(tempFile) // Clean up on error
+		_ = os.Remove(tempFile) // Clean up on error
 		return fmt.Errorf("failed to finalize model file: %w", err)
 	}
 
 	// Validate the downloaded model
 	if err := ValidateModel(modelName); err != nil {
-		os.Remove(finalPath) // Remove invalid file
+		_ = os.Remove(finalPath) // Remove invalid file
 		return fmt.Errorf("model validation failed: %w", err)
 	}
 
@@ -149,11 +157,11 @@ func EstimateTimeRemaining(downloaded, total int64, bytesPerSecond float64) stri
 
 	if seconds < 60 {
 		return fmt.Sprintf("%.0fs", seconds)
-	} else if seconds < 3600 {
+	}
+	if seconds < 3600 {
 		minutes := seconds / 60
 		return fmt.Sprintf("%.0fm", minutes)
-	} else {
-		hours := seconds / 3600
-		return fmt.Sprintf("%.1fh", hours)
 	}
+	hours := seconds / 3600
+	return fmt.Sprintf("%.1fh", hours)
 }

@@ -1,3 +1,4 @@
+// Package audio provides audio device enumeration and recording functionality.
 package audio
 
 import (
