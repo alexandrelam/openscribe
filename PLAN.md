@@ -326,7 +326,7 @@ Phase 13 (Distribution)
 ## Quick Start Checklist
 
 - [x] Phase 1: Can run `openscribe --help`
-- [ ] Phase 2: Can run `openscribe config --show`
+- [x] Phase 2: Can run `openscribe config --show`
 - [ ] Phase 3: Can run `openscribe setup` and download models
 - [ ] Phase 4: Can list and select microphones
 - [ ] Phase 5: Can transcribe a test audio file
