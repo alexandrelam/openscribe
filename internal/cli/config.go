@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -74,9 +75,30 @@ func handleShowConfig() {
 }
 
 func handleListMicrophones() {
-	// TODO: This will be implemented in Phase 4
-	fmt.Println("Available microphones:")
-	fmt.Println("  (Microphone listing will be implemented in Phase 4)")
+	fmt.Println("Detecting available microphones...")
+
+	devices, err := audio.ListMicrophones()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing microphones: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(devices) == 0 {
+		fmt.Println("No microphones found.")
+		return
+	}
+
+	fmt.Println("\nAvailable microphones:")
+	for i, device := range devices {
+		defaultMarker := ""
+		if device.IsDefault {
+			defaultMarker = " (default)"
+		}
+		fmt.Printf("  %d. %s%s\n", i+1, device.Name, defaultMarker)
+	}
+
+	fmt.Println("\nTo set a microphone, use:")
+	fmt.Println("  openscribe config --set-microphone \"<microphone name>\"")
 }
 
 func handleSetConfig(key, value string) {
@@ -89,8 +111,21 @@ func handleSetConfig(key, value string) {
 	// Update the appropriate field
 	switch key {
 	case "microphone":
+		// Validate that the microphone exists
+		if value != "" {
+			_, err := audio.FindMicrophoneByName(value)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				fmt.Println("\nRun 'openscribe config --list-microphones' to see available devices.")
+				os.Exit(1)
+			}
+		}
 		cfg.Microphone = value
-		fmt.Printf("Microphone set to: %s\n", value)
+		if value == "" {
+			fmt.Println("Microphone set to: (system default)")
+		} else {
+			fmt.Printf("Microphone set to: %s\n", value)
+		}
 	case "model":
 		cfg.Model = value
 		fmt.Printf("Model set to: %s\n", value)
