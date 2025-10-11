@@ -35,10 +35,6 @@ vendor/
 /dist/
 /build/
 
-# Application binary
-openscribe-go
-openscribe
-
 # Debug files
 __debug_bin
 
