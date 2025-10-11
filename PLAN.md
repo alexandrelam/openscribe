@@ -61,15 +61,17 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 - Model download logic (fetch Whisper models from official sources)
 - Model storage in `~/Library/Application Support/openscribe/models/`
 - Model validation (checksum, file integrity)
-- whisper.cpp detection/download/compilation logic
+- whisper.cpp detection via Homebrew
 - `openscribe models list` command
 - `openscribe models download [model]` command
-- `openscribe setup` command (downloads whisper.cpp + default small model)
+- `openscribe setup` command (checks for whisper-cpp + downloads default small model)
 - Progress indicators for downloads
+
+**Implementation Note**: Originally planned to download and compile whisper.cpp from source, but switched to using Homebrew installation (`brew install whisper-cpp`). This is much simpler, faster, and more maintainable. The setup command now checks if `whisper-cli` is available and guides users to install via Homebrew if needed.
 
 **Why this grouping**: Model management is a complete subsystem with no runtime dependencies on audio/recording. Can be tested independently.
 
-**Test**: Run `openscribe setup`, verify whisper.cpp and model downloaded. Run `openscribe models list` to see available models.
+**Test**: Run `openscribe setup`, verify whisper-cpp is installed via Homebrew and model downloaded. Run `openscribe models list` to see available models.
 
 ---
 

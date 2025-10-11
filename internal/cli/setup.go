@@ -42,51 +42,40 @@ func runSetup() {
 	fmt.Println("✓ Directories created")
 	fmt.Println()
 
-	// Step 2: Check dependencies
-	fmt.Println("[2/4] Checking system dependencies...")
-	if err := models.CheckDependencies(); err != nil {
+	// Step 2: Check for Homebrew
+	fmt.Println("[2/4] Checking for Homebrew...")
+	if err := models.CheckHomebrew(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		fmt.Println()
-		fmt.Println("Please install the missing dependencies:")
-		fmt.Println("  - On macOS: Install Xcode Command Line Tools")
-		fmt.Println("    $ xcode-select --install")
+		fmt.Println("Homebrew is required to install whisper-cpp.")
+		fmt.Println("Install Homebrew from: https://brew.sh")
 		os.Exit(1)
 	}
-	fmt.Println("✓ All dependencies found (git, make, C++ compiler)")
+	fmt.Println("✓ Homebrew is installed")
 	fmt.Println()
 
-	// Step 3: Setup whisper.cpp
-	fmt.Println("[3/4] Setting up whisper.cpp...")
+	// Step 3: Check for whisper-cli
+	fmt.Println("[3/4] Checking for whisper-cpp...")
 
-	// Check if already installed
 	installed, err := models.IsWhisperCppInstalled()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking whisper.cpp: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error checking whisper-cpp: %v\n", err)
 		os.Exit(1)
 	}
 
 	if installed {
-		fmt.Println("✓ whisper.cpp already installed")
+		fmt.Println("✓ whisper-cpp already installed")
 		whisperPath, _ := models.GetWhisperCppBinaryPath()
 		fmt.Printf("  Location: %s\n", whisperPath)
 	} else {
-		// Check if we need to download or just compile
-		whisperDir, _ := models.GetWhisperCppDir()
-		if _, err := os.Stat(whisperDir); os.IsNotExist(err) {
-			fmt.Println("  Downloading whisper.cpp from GitHub...")
-			if err := models.DownloadWhisperCpp(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error downloading whisper.cpp: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Println("  ✓ Downloaded")
-		}
-
-		fmt.Println("  Compiling whisper.cpp (this may take a few minutes)...")
-		if err := models.CompileWhisperCpp(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error compiling whisper.cpp: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("✓ whisper.cpp compiled successfully")
+		fmt.Println()
+		fmt.Println("whisper-cpp is not installed.")
+		fmt.Println()
+		fmt.Println("Please install it with Homebrew:")
+		fmt.Println("  $ brew install whisper-cpp")
+		fmt.Println()
+		fmt.Println("Then run 'openscribe setup' again.")
+		os.Exit(1)
 	}
 	fmt.Println()
 
