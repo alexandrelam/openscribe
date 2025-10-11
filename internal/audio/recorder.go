@@ -40,7 +40,7 @@ func (r *Recorder) Start() error {
 	// Initialize audio context
 	ctx, err := malgo.InitContext(nil, malgo.ContextConfig{}, nil)
 	if err != nil {
-		return fmt.Errorf("failed to initialize audio context: %w", err)
+		return fmt.Errorf("failed to initialize audio context: %w\n\nPlease check:\n  1. Your audio drivers are properly installed\n  2. System Preferences > Security & Privacy > Privacy > Microphone includes your terminal app\n  3. No other application is exclusively using the audio system", err)
 	}
 	r.context = ctx
 
@@ -67,7 +67,24 @@ func (r *Recorder) Start() error {
 		if !found {
 			_ = ctx.Uninit()
 			ctx.Free()
-			return fmt.Errorf("device not found: %s", r.deviceName)
+
+			// Provide helpful error message with available devices
+			errMsg := fmt.Sprintf("microphone not found: %s\n\nAvailable microphones:\n", r.deviceName)
+			for i, info := range infos {
+				defaultMarker := ""
+				if info.IsDefault == 1 {
+					defaultMarker = " (default)"
+				}
+				errMsg += fmt.Sprintf("  %d. %s%s\n", i+1, info.Name(), defaultMarker)
+			}
+			errMsg += "\nYou can:\n"
+			errMsg += "  1. List available microphones:\n"
+			errMsg += "     $ openscribe config --list-microphones\n"
+			errMsg += "  2. Set a different microphone:\n"
+			errMsg += "     $ openscribe config --set-microphone \"<name>\"\n"
+			errMsg += "  3. Use the default microphone (leave config empty)"
+
+			return fmt.Errorf("%s", errMsg)
 		}
 	}
 
@@ -101,7 +118,7 @@ func (r *Recorder) Start() error {
 	if err != nil {
 		_ = ctx.Uninit()
 		ctx.Free()
-		return fmt.Errorf("failed to initialize device: %w", err)
+		return fmt.Errorf("failed to initialize audio device: %w\n\nPossible causes:\n  1. The microphone is being used by another application\n  2. The microphone permissions are not granted\n  3. The audio device configuration is incompatible\n\nTry:\n  - Closing other apps that might use the microphone\n  - Granting microphone permissions in System Preferences\n  - Using the default microphone by removing the config setting", err)
 	}
 
 	err = device.Start()
@@ -109,7 +126,7 @@ func (r *Recorder) Start() error {
 		device.Uninit()
 		_ = ctx.Uninit()
 		ctx.Free()
-		return fmt.Errorf("failed to start device: %w", err)
+		return fmt.Errorf("failed to start audio recording: %w\n\nPossible causes:\n  1. The microphone is disconnected or disabled\n  2. Microphone permissions not granted\n  3. Another application has exclusive access to the microphone\n\nPlease check System Preferences > Security & Privacy > Privacy > Microphone", err)
 	}
 
 	r.device = device

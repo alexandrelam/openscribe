@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/alexandrelam/openscribe/internal/config"
@@ -14,6 +15,28 @@ import (
 
 // ProgressCallback is called periodically during download
 type ProgressCallback func(downloaded, total int64, percent float64)
+
+// checkDiskSpace verifies there's enough disk space for the download
+func checkDiskSpace(directory string, requiredBytes int64) error {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(directory, &stat); err != nil {
+		return fmt.Errorf("failed to check disk space: %w", err)
+	}
+
+	// Available blocks * block size = available bytes
+	availableBytes := int64(stat.Bavail) * int64(stat.Bsize)
+
+	// Add 10% buffer for safety
+	requiredWithBuffer := requiredBytes + (requiredBytes / 10)
+
+	if availableBytes < requiredWithBuffer {
+		return fmt.Errorf("insufficient disk space: need %s, available %s",
+			FormatBytes(requiredWithBuffer),
+			FormatBytes(availableBytes))
+	}
+
+	return nil
+}
 
 // DownloadModel downloads a Whisper model with progress reporting
 func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
@@ -32,6 +55,12 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 		return fmt.Errorf("failed to create models directory: %w", mkdirErr)
 	}
 
+	// Check disk space before attempting download
+	requiredBytes := int64(modelInfo.SizeMB) * 1024 * 1024
+	if err := checkDiskSpace(modelsDir, requiredBytes); err != nil {
+		return fmt.Errorf("cannot download model: %w", err)
+	}
+
 	// Download to a temporary file first
 	tempFile := filepath.Join(modelsDir, modelInfo.FileName+".tmp")
 	finalPath := filepath.Join(modelsDir, modelInfo.FileName)
@@ -41,18 +70,43 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 		return fmt.Errorf("model already exists: %s", modelName)
 	}
 
-	// Create the HTTP request
-	resp, err := http.Get(modelInfo.URL)
-	if err != nil {
-		return fmt.Errorf("failed to download model: %w", err)
+	// Create the HTTP request with timeout and retry logic
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // 5 minute timeout for each request
 	}
+
+	var resp *http.Response
+	var httpErr error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, httpErr = client.Get(modelInfo.URL)
+		if httpErr == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+
+		// Close response body if we got one
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+
+		if attempt < maxRetries {
+			// Wait before retrying (exponential backoff)
+			waitTime := time.Duration(attempt) * 2 * time.Second
+			time.Sleep(waitTime)
+			continue
+		}
+
+		// All retries exhausted
+		if httpErr != nil {
+			return fmt.Errorf("failed to download model after %d attempts: %w\nPlease check your internet connection", maxRetries, httpErr)
+		}
+		return fmt.Errorf("failed to download model after %d attempts: HTTP %d\nServer returned error: %s", maxRetries, resp.StatusCode, resp.Status)
+	}
+
 	defer func() {
 		_ = resp.Body.Close() // Best effort close
 	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download model: HTTP %d", resp.StatusCode)
-	}
 
 	// Create the temporary file
 	out, err := os.Create(tempFile)

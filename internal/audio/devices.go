@@ -41,7 +41,7 @@ func listMicrophonesWithEnumerator(enumerator DeviceEnumerator) ([]Device, error
 	}
 
 	if len(infos) == 0 {
-		return nil, fmt.Errorf("no audio input devices found")
+		return nil, fmt.Errorf("no audio input devices found\n\nPlease check that:\n  1. A microphone is connected to your computer\n  2. Your microphone is enabled in System Preferences > Sound > Input\n  3. OpenScribe has microphone permissions in System Preferences > Security & Privacy > Privacy > Microphone")
 	}
 
 	devices := make([]Device, 0, len(infos))

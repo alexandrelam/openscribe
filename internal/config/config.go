@@ -78,6 +78,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration in %s: %w\n\nYou can reset to defaults by running:\n  rm %s\n  openscribe config --show", configPath, err, configPath)
+	}
+
 	return cfg, nil
 }
 
@@ -125,6 +130,24 @@ func (c *Config) Validate() error {
 	if c.Hotkey == "" {
 		return fmt.Errorf("hotkey cannot be empty")
 	}
+
+	// Validate hotkey is a known key
+	validHotkeys := map[string]bool{
+		"Left Option":   true,
+		"Right Option":  true,
+		"Left Shift":    true,
+		"Right Shift":   true,
+		"Left Command":  true,
+		"Right Command": true,
+		"Left Control":  true,
+		"Right Control": true,
+	}
+	if !validHotkeys[c.Hotkey] {
+		return fmt.Errorf("invalid hotkey: %s (must be one of: Left Option, Right Option, Left Shift, Right Shift, Left Command, Right Command, Left Control, Right Control)", c.Hotkey)
+	}
+
+	// Note: We don't validate language codes as Whisper supports many languages
+	// and we don't want to restrict users to a predefined list
 
 	return nil
 }

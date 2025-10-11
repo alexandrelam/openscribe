@@ -19,6 +19,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// MaxRecordingDuration is the maximum allowed recording duration (5 minutes)
+	MaxRecordingDuration = 5 * time.Minute
+	// RecordingTimeoutWarning is when we warn the user about timeout (4 minutes)
+	RecordingTimeoutWarning = 4 * time.Minute
+)
+
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the OpenScribe service",
@@ -177,14 +184,27 @@ func runStart(cmd *cobra.Command) {
 
 	// State management
 	var (
-		mu          sync.Mutex
-		isRecording bool
-		recorder    *audio.Recorder
-		recordStart time.Time
+		mu               sync.Mutex
+		isRecording      bool
+		isTranscribing   bool
+		recorder         *audio.Recorder
+		recordStart      time.Time
+		timeoutTimer     *time.Timer
+		warningTimer     *time.Timer
+		transcribingLock sync.Mutex // Separate lock for transcription state
 	)
 
 	// Create hotkey callback
 	hotkeyCallback := func() {
+		// Check if currently transcribing
+		transcribingLock.Lock()
+		if isTranscribing {
+			transcribingLock.Unlock()
+			fmt.Println("⚠️  Transcription in progress, please wait...")
+			return
+		}
+		transcribingLock.Unlock()
+
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -193,6 +213,7 @@ func runStart(cmd *cobra.Command) {
 			isRecording = true
 			recordStart = time.Now()
 			fmt.Println("🔴 Recording started... (double-press hotkey again to stop)")
+			fmt.Printf("   Maximum recording time: %.0f minutes\n", MaxRecordingDuration.Minutes())
 
 			// Play start sound
 			if feedback != nil {
@@ -208,10 +229,176 @@ func runStart(cmd *cobra.Command) {
 				isRecording = false
 				return
 			}
+
+			// Set up warning timer (4 minutes)
+			warningTimer = time.AfterFunc(RecordingTimeoutWarning, func() {
+				fmt.Printf("\n⚠️  Warning: Recording has been running for %.0f minutes\n", RecordingTimeoutWarning.Minutes())
+				fmt.Printf("   Will auto-stop in %.0f minute\n", (MaxRecordingDuration - RecordingTimeoutWarning).Minutes())
+			})
+
+			// Set up automatic timeout (5 minutes)
+			timeoutTimer = time.AfterFunc(MaxRecordingDuration, func() {
+				mu.Lock()
+
+				if !isRecording {
+					mu.Unlock()
+					return
+				}
+
+				fmt.Printf("\n⏱️  Recording automatically stopped after %.0f minutes (max duration)\n", MaxRecordingDuration.Minutes())
+				fmt.Println("⏹  Recording stopped. Transcribing...")
+
+				// Trigger the stop recording logic
+				isRecording = false
+				recordDuration := time.Since(recordStart).Seconds()
+				currentRecorder := recorder
+
+				mu.Unlock()
+
+				// Play stop sound
+				if feedback != nil {
+					if err := feedback.PlayStopSound(); err != nil && cfg.Verbose {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to play stop sound: %v\n", err)
+					}
+				}
+
+				// Mark as transcribing
+				transcribingLock.Lock()
+				isTranscribing = true
+				transcribingLock.Unlock()
+
+				// Stop recorder and get audio data
+				audioData, err := currentRecorder.Stop()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error stopping recording: %v\n", err)
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				if len(audioData) == 0 {
+					fmt.Fprintf(os.Stderr, "Warning: No audio data captured\n")
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				// Save audio to temporary WAV file
+				cacheDir, err := config.GetCacheDir()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error getting cache directory: %v\n", err)
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				// Ensure cache directory exists
+				if err := os.MkdirAll(cacheDir, 0755); err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating cache directory: %v\n", err)
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				// Create temporary WAV file
+				timestamp := time.Now().Format("20060102_150405")
+				wavPath := filepath.Join(cacheDir, fmt.Sprintf("recording_%s.wav", timestamp))
+
+				if err := audio.SaveWAV(wavPath, audioData, currentRecorder.GetSampleRate(), currentRecorder.GetChannels()); err != nil {
+					fmt.Fprintf(os.Stderr, "Error saving audio file: %v\n", err)
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				if cfg.Verbose {
+					fmt.Printf("Audio saved to: %s\n", wavPath)
+				}
+
+				// Transcribe audio
+				opts := transcription.Options{
+					Model:    modelSize,
+					Language: cfg.Language,
+					Verbose:  cfg.Verbose,
+				}
+				result, err := transcriber.TranscribeFile(wavPath, opts)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error transcribing audio: %v\n", err)
+					_ = os.Remove(wavPath)
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				// Clean up WAV file (unless verbose mode)
+				if !cfg.Verbose {
+					_ = os.Remove(wavPath)
+				}
+
+				// Play complete sound
+				if feedback != nil {
+					if err := feedback.PlayCompleteSound(); err != nil && cfg.Verbose {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to play complete sound: %v\n", err)
+					}
+				}
+
+				transcriptionText := result.Text
+				if transcriptionText == "" {
+					fmt.Println("⚠️  No speech detected in recording")
+					transcribingLock.Lock()
+					isTranscribing = false
+					transcribingLock.Unlock()
+					return
+				}
+
+				fmt.Printf("Transcription: \"%s\"\n", transcriptionText)
+
+				// Auto-paste if enabled
+				if cfg.AutoPaste && kb != nil {
+					if err := kb.TypeText(transcriptionText); err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to paste text: %v\n", err)
+					} else {
+						fmt.Println("✅ Text pasted to cursor position!")
+					}
+				} else {
+					fmt.Println("✅ Transcription complete!")
+				}
+
+				// Log transcription
+				if err := logging.LogTranscription(recordDuration, cfg.Model, result.Language, transcriptionText); err != nil {
+					if cfg.Verbose {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to log transcription: %v\n", err)
+					}
+				} else {
+					logPath, _ := config.GetTranscriptionLogPath()
+					timestamp := time.Now().Format("2006-01-02 15:04:05")
+					fmt.Printf("\n[%s] Logged to %s\n", timestamp, logPath)
+				}
+
+				// Clear transcribing flag
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
+			})
 		} else {
 			// Stop recording
 			isRecording = false
 			recordDuration := time.Since(recordStart).Seconds()
+
+			// Cancel timers
+			if timeoutTimer != nil {
+				timeoutTimer.Stop()
+			}
+			if warningTimer != nil {
+				warningTimer.Stop()
+			}
+
 			fmt.Println("⏹  Recording stopped. Transcribing...")
 
 			// Play stop sound
@@ -221,15 +408,26 @@ func runStart(cmd *cobra.Command) {
 				}
 			}
 
+			// Mark as transcribing
+			transcribingLock.Lock()
+			isTranscribing = true
+			transcribingLock.Unlock()
+
 			// Stop recorder and get audio data
 			audioData, err := recorder.Stop()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error stopping recording: %v\n", err)
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
 			if len(audioData) == 0 {
 				fmt.Fprintf(os.Stderr, "Warning: No audio data captured\n")
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
@@ -237,12 +435,18 @@ func runStart(cmd *cobra.Command) {
 			cacheDir, err := config.GetCacheDir()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error getting cache directory: %v\n", err)
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
 			// Ensure cache directory exists
 			if err := os.MkdirAll(cacheDir, 0755); err != nil {
 				fmt.Fprintf(os.Stderr, "Error creating cache directory: %v\n", err)
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
@@ -252,6 +456,9 @@ func runStart(cmd *cobra.Command) {
 
 			if err := audio.SaveWAV(wavPath, audioData, recorder.GetSampleRate(), recorder.GetChannels()); err != nil {
 				fmt.Fprintf(os.Stderr, "Error saving audio file: %v\n", err)
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
@@ -270,6 +477,9 @@ func runStart(cmd *cobra.Command) {
 				fmt.Fprintf(os.Stderr, "Error transcribing audio: %v\n", err)
 				// Clean up WAV file
 				_ = os.Remove(wavPath)
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
@@ -288,6 +498,9 @@ func runStart(cmd *cobra.Command) {
 			transcription := result.Text
 			if transcription == "" {
 				fmt.Println("⚠️  No speech detected in recording")
+				transcribingLock.Lock()
+				isTranscribing = false
+				transcribingLock.Unlock()
 				return
 			}
 
@@ -314,6 +527,11 @@ func runStart(cmd *cobra.Command) {
 				timestamp := time.Now().Format("2006-01-02 15:04:05")
 				fmt.Printf("\n[%s] Logged to %s\n", timestamp, logPath)
 			}
+
+			// Clear transcribing flag
+			transcribingLock.Lock()
+			isTranscribing = false
+			transcribingLock.Unlock()
 		}
 	}
 
