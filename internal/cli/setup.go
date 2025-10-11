@@ -138,6 +138,19 @@ func runSetup() {
 		fmt.Println("✓ Model downloaded successfully")
 	}
 
+	// Update config file to ensure it uses the downloaded model
+	cfg, err := config.Load()
+	if err != nil {
+		// Don't fail setup if config loading fails, just warn
+		fmt.Fprintf(os.Stderr, "Warning: Could not update config file: %v\n", err)
+	} else if cfg.Model != string(defaultModel) {
+		// Update the model in config to match what was downloaded
+		cfg.Model = string(defaultModel)
+		if saveErr := cfg.Save(); saveErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not save updated config: %v\n", saveErr)
+		}
+	}
+
 	// Final summary
 	fmt.Println()
 	fmt.Println("================")

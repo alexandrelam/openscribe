@@ -69,11 +69,31 @@ func runStart(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 	if !isDownloaded {
+		// Check if any other models are downloaded
+		downloadedModels, listErr := models.ListDownloadedModels()
+
 		fmt.Fprintf(os.Stderr, "⚠️  Model '%s' is not downloaded!\n\n", cfg.Model)
-		fmt.Fprintf(os.Stderr, "Please run setup to download a model:\n")
-		fmt.Fprintf(os.Stderr, "  $ openscribe setup\n\n")
-		fmt.Fprintf(os.Stderr, "Or download a specific model:\n")
-		fmt.Fprintf(os.Stderr, "  $ openscribe models download %s\n\n", cfg.Model)
+
+		if listErr == nil && len(downloadedModels) > 0 {
+			// Suggest using an available model
+			fmt.Fprintf(os.Stderr, "You have these models downloaded:\n")
+			for _, m := range downloadedModels {
+				fmt.Fprintf(os.Stderr, "  - %s\n", m)
+			}
+			fmt.Fprintf(os.Stderr, "\nYou can:\n")
+			fmt.Fprintf(os.Stderr, "  1. Use an available model:\n")
+			fmt.Fprintf(os.Stderr, "     $ openscribe start --model %s\n\n", downloadedModels[0])
+			fmt.Fprintf(os.Stderr, "  2. Update your config:\n")
+			fmt.Fprintf(os.Stderr, "     $ openscribe config set model %s\n\n", downloadedModels[0])
+			fmt.Fprintf(os.Stderr, "  3. Download the '%s' model:\n", cfg.Model)
+			fmt.Fprintf(os.Stderr, "     $ openscribe models download %s\n\n", cfg.Model)
+		} else {
+			// No models available
+			fmt.Fprintf(os.Stderr, "Please run setup to download a model:\n")
+			fmt.Fprintf(os.Stderr, "  $ openscribe setup\n\n")
+			fmt.Fprintf(os.Stderr, "Or download a specific model:\n")
+			fmt.Fprintf(os.Stderr, "  $ openscribe models download %s\n\n", cfg.Model)
+		}
 		os.Exit(1)
 	}
 
