@@ -72,11 +72,8 @@ func (k *macKeyboard) TypeText(text string) error {
 		return fmt.Errorf("cannot type text: %w", err)
 	}
 
-	// Convert string to runes (Unicode characters)
-	runes := []rune(text)
-
 	// Type each character with a small delay to ensure reliability
-	for _, r := range runes {
+	for _, r := range text {
 		C.typeUnicodeChar(C.UniChar(r))
 		// Small delay between characters (2ms) for reliability
 		time.Sleep(2 * time.Millisecond)

@@ -41,7 +41,11 @@ func TestCheckPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() failed: %v", err)
 	}
-	defer kb.Close()
+	defer func() {
+		if err := kb.Close(); err != nil {
+			t.Errorf("Close() failed: %v", err)
+		}
+	}()
 
 	// Check permissions - may or may not be granted in test environment
 	err = kb.CheckPermissions()
@@ -59,7 +63,11 @@ func TestTypeText_EmptyString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() failed: %v", err)
 	}
-	defer kb.Close()
+	defer func() {
+		if err := kb.Close(); err != nil {
+			t.Errorf("Close() failed: %v", err)
+		}
+	}()
 
 	// Test with empty string (should not crash)
 	// Note: This will fail if permissions aren't granted, which is expected
@@ -78,7 +86,11 @@ func TestTypeText_Unicode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() failed: %v", err)
 	}
-	defer kb.Close()
+	defer func() {
+		if err := kb.Close(); err != nil {
+			t.Errorf("Close() failed: %v", err)
+		}
+	}()
 
 	// Test with Unicode characters
 	testStrings := []string{
@@ -144,7 +156,11 @@ func BenchmarkTypeText(b *testing.B) {
 	if err != nil {
 		b.Fatalf("New() failed: %v", err)
 	}
-	defer kb.Close()
+	defer func() {
+		if err := kb.Close(); err != nil {
+			b.Errorf("Close() failed: %v", err)
+		}
+	}()
 
 	// Check if permissions are granted
 	if err := kb.CheckPermissions(); err != nil {
@@ -168,7 +184,11 @@ func BenchmarkCheckPermissions(b *testing.B) {
 	if err != nil {
 		b.Fatalf("New() failed: %v", err)
 	}
-	defer kb.Close()
+	defer func() {
+		if err := kb.Close(); err != nil {
+			b.Errorf("Close() failed: %v", err)
+		}
+	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
