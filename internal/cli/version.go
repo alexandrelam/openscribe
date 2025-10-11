@@ -20,9 +20,11 @@ var versionCmd = &cobra.Command{
 	Short: "Show version information",
 	Long:  `Display the version, git commit, and build date of OpenScribe.`,
 	Run: func(_ *cobra.Command, _ []string) {
-		fmt.Printf("OpenScribe %s\n", Version)
-		fmt.Printf("Git Commit: %s\n", GitCommit)
+		fmt.Printf("OpenScribe v%s\n", Version)
+		fmt.Printf("Commit:     %s\n", GitCommit)
 		fmt.Printf("Build Date: %s\n", BuildDate)
+		fmt.Printf("Platform:   darwin/amd64\n")
+		fmt.Printf("\nFor more information, visit: https://github.com/alexandrelam/openscribe-go\n")
 	},
 }
 
