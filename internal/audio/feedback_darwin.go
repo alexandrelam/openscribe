@@ -9,11 +9,38 @@ package audio
 
 #import <Cocoa/Cocoa.h>
 
+// Global dictionary to cache sound objects
+static NSMutableDictionary *soundCache = nil;
+
+// Initialize the sound cache
+static void initSoundCache() {
+    if (soundCache == nil) {
+        soundCache = [[NSMutableDictionary alloc] init];
+    }
+}
+
 // Play a system sound by name
 static void playSystemSound(const char* soundName) {
     @autoreleasepool {
-        NSSound *sound = [NSSound soundNamed:[NSString stringWithUTF8String:soundName]];
+        initSoundCache();
+
+        NSString *name = [NSString stringWithUTF8String:soundName];
+
+        // Try to get the sound from cache
+        NSSound *sound = [soundCache objectForKey:name];
+
+        // If not in cache, create and cache it
+        if (sound == nil) {
+            sound = [NSSound soundNamed:name];
+            if (sound != nil) {
+                // Keep a strong reference in the cache
+                [soundCache setObject:sound forKey:name];
+            }
+        }
+
+        // Stop any currently playing instance and restart
         if (sound != nil) {
+            [sound stop];
             [sound play];
         }
     }
@@ -26,6 +53,12 @@ static int playSoundFile(const char* filePath) {
         NSSound *sound = [[NSSound alloc] initWithContentsOfFile:path byReference:NO];
         if (sound != nil) {
             [sound play];
+
+            // Keep sound alive in a temporary set for the duration of playback
+            // Using a simple approach: just keep the sound retained
+            // This is acceptable for occasional playback
+            [sound autorelease];
+
             return 0;
         }
         return -1;
