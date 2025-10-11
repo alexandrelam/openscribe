@@ -70,7 +70,7 @@ func GetTranscriptions(tail int) ([]TranscriptionEntry, error) {
 	}
 
 	// Check if log file exists
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(logPath); os.IsNotExist(statErr) {
 		return []TranscriptionEntry{}, nil
 	}
 

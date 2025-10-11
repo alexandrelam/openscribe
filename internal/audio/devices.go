@@ -9,11 +9,11 @@ import (
 
 // Device represents an audio input device
 type Device struct {
-	ID          string
-	Name        string
-	IsDefault   bool
-	SampleRate  uint32
-	Channels    uint32
+	ID         string
+	Name       string
+	IsDefault  bool
+	SampleRate uint32
+	Channels   uint32
 }
 
 // ListMicrophones returns a list of all available audio input devices

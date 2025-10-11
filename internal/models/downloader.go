@@ -27,8 +27,8 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 		return fmt.Errorf("failed to get models directory: %w", err)
 	}
 
-	if err := os.MkdirAll(modelsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create models directory: %w", err)
+	if mkdirErr := os.MkdirAll(modelsDir, 0755); mkdirErr != nil {
+		return fmt.Errorf("failed to create models directory: %w", mkdirErr)
 	}
 
 	// Download to a temporary file first
@@ -36,7 +36,7 @@ func DownloadModel(modelName ModelSize, progress ProgressCallback) error {
 	finalPath := filepath.Join(modelsDir, modelInfo.FileName)
 
 	// Check if model already exists
-	if _, err := os.Stat(finalPath); err == nil {
+	if _, statErr := os.Stat(finalPath); statErr == nil {
 		return fmt.Errorf("model already exists: %s", modelName)
 	}
 

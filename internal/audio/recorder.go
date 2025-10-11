@@ -48,11 +48,11 @@ func (r *Recorder) Start() error {
 	var deviceInfo *malgo.DeviceInfo
 	if r.deviceName != "" {
 		// Find specific device by name
-		infos, err := ctx.Devices(malgo.Capture)
-		if err != nil {
-			ctx.Uninit()
+		infos, devicesErr := ctx.Devices(malgo.Capture)
+		if devicesErr != nil {
+			_ = ctx.Uninit()
 			ctx.Free()
-			return fmt.Errorf("failed to enumerate devices: %w", err)
+			return fmt.Errorf("failed to enumerate devices: %w", devicesErr)
 		}
 
 		found := false
@@ -65,7 +65,7 @@ func (r *Recorder) Start() error {
 		}
 
 		if !found {
-			ctx.Uninit()
+			_ = ctx.Uninit()
 			ctx.Free()
 			return fmt.Errorf("device not found: %s", r.deviceName)
 		}
@@ -99,7 +99,7 @@ func (r *Recorder) Start() error {
 		Data: onRecvFrames,
 	})
 	if err != nil {
-		ctx.Uninit()
+		_ = ctx.Uninit()
 		ctx.Free()
 		return fmt.Errorf("failed to initialize device: %w", err)
 	}
@@ -107,7 +107,7 @@ func (r *Recorder) Start() error {
 	err = device.Start()
 	if err != nil {
 		device.Uninit()
-		ctx.Uninit()
+		_ = ctx.Uninit()
 		ctx.Free()
 		return fmt.Errorf("failed to start device: %w", err)
 	}

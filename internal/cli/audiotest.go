@@ -37,9 +37,9 @@ func runAudioTest(durationSeconds int) {
 	micName := cfg.Microphone
 	if micName == "" {
 		fmt.Println("No microphone configured, using system default...")
-		device, err := audio.GetDefaultMicrophone()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting default microphone: %v\n", err)
+		device, deviceErr := audio.GetDefaultMicrophone()
+		if deviceErr != nil {
+			fmt.Fprintf(os.Stderr, "Error getting default microphone: %v\n", deviceErr)
 			os.Exit(1)
 		}
 		micName = device.Name
@@ -55,8 +55,8 @@ func runAudioTest(durationSeconds int) {
 
 	// Start recording
 	fmt.Printf("Starting recording...\n")
-	if err := recorder.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting recording: %v\n", err)
+	if startErr := recorder.Start(); startErr != nil {
+		fmt.Fprintf(os.Stderr, "Error starting recording: %v\n", startErr)
 		os.Exit(1)
 	}
 

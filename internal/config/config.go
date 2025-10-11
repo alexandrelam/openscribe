@@ -57,11 +57,11 @@ func Load() (*Config, error) {
 	}
 
 	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
 		// Config doesn't exist, create with defaults
 		cfg := DefaultConfig()
-		if err := cfg.Save(); err != nil {
-			return nil, fmt.Errorf("failed to save default config: %w", err)
+		if saveErr := cfg.Save(); saveErr != nil {
+			return nil, fmt.Errorf("failed to save default config: %w", saveErr)
 		}
 		return cfg, nil
 	}
@@ -88,8 +88,8 @@ func (c *Config) Save() error {
 	}
 
 	// Ensure parent directory exists
-	if err := EnsureDirectories(); err != nil {
-		return fmt.Errorf("failed to create directories: %w", err)
+	if dirErr := EnsureDirectories(); dirErr != nil {
+		return fmt.Errorf("failed to create directories: %w", dirErr)
 	}
 
 	// Marshal config to YAML

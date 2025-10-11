@@ -130,10 +130,10 @@ func TestFindMicrophoneByNameInList(t *testing.T) {
 	devices := createMockDevices()
 
 	testCases := []struct {
-		name          string
-		searchName    string
-		expectError   bool
-		expectedName  string
+		name         string
+		searchName   string
+		expectError  bool
+		expectedName string
 	}{
 		{"FindFirst", "MacBook Pro Microphone", false, "MacBook Pro Microphone"},
 		{"FindSecond", "External USB Mic", false, "External USB Mic"},

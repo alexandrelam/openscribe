@@ -21,7 +21,7 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-model") &&
 			!cmd.Flags().Changed("set-language") &&
 			!cmd.Flags().Changed("set-hotkey") {
-			cmd.Help()
+			_ = cmd.Help()
 			return
 		}
 
