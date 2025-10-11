@@ -75,17 +75,7 @@ jobs:
           fs.writeFileSync('docs-build/formula/index.html', html);
 
           // Create index redirect
-          const indexHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=./formula/">
-  <link rel="canonical" href="./formula/" />
-</head>
-<body>
-  <p>Redirecting to <a href="./formula/">OpenScribe formula page</a>...</p>
-</body>
-</html>`;
+          const indexHtml = '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <meta http-equiv="refresh" content="0; url=./formula/">\n  <link rel="canonical" href="./formula/" />\n</head>\n<body>\n  <p>Redirecting to <a href="./formula/">OpenScribe formula page</a>...</p>\n</body>\n</html>';
 
           fs.writeFileSync('docs-build/index.html', indexHtml);
           NODE
