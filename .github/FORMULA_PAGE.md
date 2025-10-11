@@ -1,6 +1,6 @@
 # Homebrew Formula Page
 
-This repository includes a GitHub Actions workflow that generates a beautiful Homebrew formula page for OpenScribe.
+This repository includes a GitHub Actions workflow that generates a simple GitHub Pages site for OpenScribe using Jekyll's default theme.
 
 ## 🌐 Live Site
 
@@ -16,7 +16,7 @@ Once deployed, the formula page will be available at:
 3. Click the **"Run workflow"** button (top right)
 4. Optionally add a reason (e.g., "Updated to v0.2.0")
 5. Click **"Run workflow"**
-6. Wait ~2-3 minutes for the build to complete
+6. Wait ~1-2 minutes for the build to complete
 7. Visit: https://alexandrelam.github.io/openscribe/
 
 ### Option 2: Via GitHub CLI
@@ -52,52 +52,43 @@ Follow the steps in "How to Generate/Update the Page" above.
 ## 📁 Files
 
 - `.github/workflows/deploy-formula-page.yml` - GitHub Actions workflow
-- `.github/formula-page-template.mustache` - HTML template
+- `docs/index.md` - Main content (markdown)
+- `docs/_config.yml` - Jekyll configuration
 - `.github/FORMULA_PAGE.md` - This file
 
 ## 🎨 Customization
 
-### Change Colors
-
-Edit `.github/formula-page-template.mustache` and modify the CSS variables:
-
-```css
-:root {
-  --primary-color: #FF6B6B;      /* Change to your brand color */
-  --secondary-color: #4ECDC4;    /* Change accent color */
-  /* ... */
-}
-```
-
 ### Change Content
 
-The page automatically pulls information from your Homebrew formula:
-- Name, description, version
-- Dependencies
-- Bottles (pre-built binaries)
+Edit `docs/index.md` to update the page content. It's just markdown, so it's easy to edit!
 
-To add custom sections, edit the template file.
+### Change Theme
+
+Edit `docs/_config.yml` and change the `theme` value. Available themes:
+- `minima` (default, clean and minimal)
+- `minimal`
+- `cayman`
+- `slate`
+- `modernist`
+
+See all themes: https://pages.github.com/themes/
 
 ## 🔧 How It Works
 
 When you run the workflow:
 
 1. Checks out this repository
-2. Installs your Homebrew formula from the tap
-3. Extracts formula information as JSON
-4. Uses the Mustache template to generate HTML
-5. Pushes the generated HTML to the `gh-pages` branch
-6. GitHub Pages serves the static site
+2. Copies the `docs/` folder to the `gh-pages` branch
+3. GitHub Pages automatically uses Jekyll to render the markdown as HTML
 
 ## 📋 When to Regenerate
 
 You should manually run the workflow when:
 
+- ✅ You update `docs/index.md` with new content
 - ✅ You release a new version
-- ✅ You update the formula description
-- ✅ You change dependencies
-- ✅ You want to update the page styling
-- ✅ You add new bottles/platforms
+- ✅ You change installation instructions
+- ✅ You want to update the page styling/theme
 
 **Note:** The workflow does NOT run automatically on commits. You must trigger it manually.
 
@@ -117,25 +108,23 @@ Check the Actions tab for errors. Common issues:
 1. **Permissions error**
    - Solution: Enable "Read and write permissions" in Settings → Actions
 
-2. **Formula not found**
-   - Solution: Ensure your formula exists at `alexandrelam/openscribe/openscribe`
-   - Test locally: `brew tap alexandrelam/openscribe && brew info alexandrelam/openscribe/openscribe`
-
-3. **JSON parsing error**
-   - Solution: Verify your formula is valid: `brew audit alexandrelam/openscribe/openscribe`
+2. **Page looks unstyled**
+   - Solution: Make sure `docs/_config.yml` exists with a theme specified
+   - GitHub Pages needs a few minutes to build the Jekyll site
 
 ## 💡 Tips
 
-- The workflow is lightweight and completes in ~2-3 minutes
+- The workflow is lightweight and completes in ~1-2 minutes
 - You can run it as many times as you want
 - It's safe to run multiple times - it just overwrites the existing page
 - The `gh-pages` branch is auto-created on first run
+- Edit `docs/index.md` to change the page content anytime
 
 ## 🔗 Links
 
 - [GitHub Pages Documentation](https://docs.github.com/en/pages)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)
+- [Jekyll Themes](https://pages.github.com/themes/)
 
 ---
 
