@@ -32,3 +32,14 @@ func (f *noopFeedback) PlayCompleteSound() error {
 func (f *noopFeedback) Close() error {
 	return nil
 }
+
+// Disable does nothing on unsupported platforms
+func (f *noopFeedback) Disable() {}
+
+// Enable does nothing on unsupported platforms
+func (f *noopFeedback) Enable() {}
+
+// ListSystemSounds returns an empty list on unsupported platforms
+func ListSystemSounds() []string {
+	return []string{}
+}

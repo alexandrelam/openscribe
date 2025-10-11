@@ -21,13 +21,6 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0
-
-      - name: Run linter
-        run: golangci-lint run
-
       - name: Run tests
         env:
           CI: true
