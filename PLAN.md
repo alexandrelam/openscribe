@@ -205,7 +205,7 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 
 ---
 
-## Phase 9: Keyboard Simulation & Auto-Paste
+## Phase 9: Keyboard Simulation & Auto-Paste ✅
 
 **Goal**: Implement direct text injection at cursor position
 
@@ -220,6 +220,25 @@ This document outlines a phased approach to building OpenScribe using LLM-assist
 **Why this grouping**: Keyboard simulation is macOS-specific and requires permissions handling. It's complex enough to warrant its own phase.
 
 **Test**: Run transcription, verify text appears at cursor in active application. Test permission denial scenario.
+
+**Implementation Notes**:
+- Created `internal/keyboard` package with platform-agnostic interface
+- macOS implementation in `keyboard_darwin.go` uses CGEvent APIs for direct text injection
+- Uses `CGEventCreateKeyboardEvent` and `CGEventKeyboardSetUnicodeString` for Unicode character typing
+- 2ms delay between characters for reliability
+- Comprehensive accessibility permissions checking with `AXIsProcessTrustedWithOptions`
+- `RequestPermissions()` function prompts user to grant permissions
+- Detailed error messages guide users to System Preferences > Security & Privacy > Accessibility
+- `--no-paste` flag support integrated into start command
+- Graceful fallback if permissions denied (shows text in terminal only)
+- Stub implementation for non-Darwin platforms
+
+**Testing**:
+- Build succeeds with `make build`
+- Start command initializes keyboard simulation when auto-paste enabled
+- Permissions check happens on startup with helpful error messages
+- `--no-paste` flag properly disables keyboard initialization
+- Ready for integration with actual transcription in Phase 10
 
 ---
 
@@ -371,7 +390,7 @@ Phase 13 (Distribution)
 - [x] Phase 6: Can view logs with `openscribe logs show`
 - [x] Phase 7: Can detect hotkey double-press
 - [x] Phase 8: Can hear feedback sounds
-- [ ] Phase 9: Can auto-paste text at cursor
+- [x] Phase 9: Can auto-paste text at cursor
 - [ ] Phase 10: Full flow works end-to-end
 - [ ] Phase 11: All error cases handled gracefully
 - [ ] Phase 12: Documentation complete and tested

@@ -10,6 +10,7 @@ import (
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/alexandrelam/openscribe/internal/hotkey"
+	"github.com/alexandrelam/openscribe/internal/keyboard"
 	"github.com/spf13/cobra"
 )
 
@@ -85,6 +86,39 @@ func runStart(cmd *cobra.Command) {
 		}
 	}
 
+	// Initialize keyboard simulation if auto-paste is enabled
+	var kb keyboard.Keyboard
+	if cfg.AutoPaste {
+		var err error
+		kb, err = keyboard.New()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Failed to initialize keyboard simulation: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() {
+			if err := kb.Close(); err != nil && cfg.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to close keyboard: %v\n", err)
+			}
+		}()
+
+		// Check accessibility permissions
+		if err := kb.CheckPermissions(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Accessibility permissions not granted.\n\n")
+			fmt.Fprintf(os.Stderr, "Auto-paste requires accessibility permissions to simulate keyboard input.\n")
+			fmt.Fprintf(os.Stderr, "Please grant permissions in:\n")
+			fmt.Fprintf(os.Stderr, "  System Preferences > Security & Privacy > Privacy > Accessibility\n\n")
+			fmt.Fprintf(os.Stderr, "Add 'Terminal' (or your terminal app) to the list of allowed applications.\n\n")
+			fmt.Fprintf(os.Stderr, "Alternatively, run with --no-paste to disable auto-paste:\n")
+			fmt.Fprintf(os.Stderr, "  openscribe start --no-paste\n\n")
+
+			// Prompt user to grant permissions
+			fmt.Fprintf(os.Stderr, "Would you like to open System Preferences now? This will prompt for permissions.\n")
+			fmt.Fprintf(os.Stderr, "After granting permissions, please restart OpenScribe.\n\n")
+			keyboard.RequestPermissions()
+			os.Exit(1)
+		}
+	}
+
 	// State management
 	var (
 		mu          sync.Mutex
@@ -122,6 +156,8 @@ func runStart(cmd *cobra.Command) {
 			}
 
 			// TODO: Stop recording and transcribe in Phase 10
+			// For now, we'll use a sample transcription for testing
+			sampleTranscription := "Hello, this is a test of the OpenScribe application."
 
 			// Play complete sound when transcription is done
 			if feedback != nil {
@@ -130,7 +166,20 @@ func runStart(cmd *cobra.Command) {
 				}
 			}
 
-			fmt.Println("✅ Transcription complete!")
+			fmt.Printf("Transcription: \"%s\"\n", sampleTranscription)
+
+			// Auto-paste if enabled
+			if cfg.AutoPaste && kb != nil {
+				if err := kb.TypeText(sampleTranscription); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to paste text: %v\n", err)
+				} else {
+					fmt.Println("✅ Text pasted to cursor position!")
+				}
+			} else {
+				fmt.Println("✅ Transcription complete!")
+			}
+
+			// TODO: Log transcription in Phase 10
 		}
 	}
 
