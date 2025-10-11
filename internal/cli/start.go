@@ -123,7 +123,8 @@ func runStart(cmd *cobra.Command) {
 		language = "auto-detect"
 	}
 
-	fmt.Println("OpenScribe Starting...")
+	fmt.Printf("OpenScribe v%s Starting...\n", Version)
+	fmt.Printf("  Build:           %s (%s)\n", GitCommit, BuildDate)
 	fmt.Printf("  Microphone:      %s\n", microphone)
 	fmt.Printf("  Model:           %s\n", cfg.Model)
 	fmt.Printf("  Language:        %s\n", language)
