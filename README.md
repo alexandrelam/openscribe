@@ -10,7 +10,7 @@
 *Transform your voice into text instantly, anywhere, without compromising your privacy*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Go 1.21+](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
 
 ---
@@ -35,7 +35,7 @@
 - Full-featured app with professional-grade accuracy
 - Open source - modify and customize as you wish
 
-### 🔒 **Your Privacy Guaranteed** 
+### 🔒 **Your Privacy Guaranteed**
 - **100% offline processing** - your voice never leaves your Mac
 - No internet required, no data sent to servers
 - Unlike cloud-based services, your conversations stay private
@@ -47,481 +47,463 @@
 
 ### ⚡ **Blazing Fast & Accurate**
 - Real-time transcription with industry-leading Whisper AI
-- 11+ languages with auto-detection
-- Smart voice detection skips silence for 60-80% performance boost
-
-## ⚡ Quick Start - Get Running in 2 Minutes
-
-### 🖥️ One-Command Installation
-
-```bash
-# Clone and install globally
-git clone git@github.com:alexandrelam/openscribe.git
-cd openscribe
-./install.sh
-```
-
-### 🎤 Start Using Immediately
-
-```bash
-# Launch the app from anywhere
-openscribe
-
-# Or use CLI mode
-openscribe --cli
-```
-
-**That's it!** Hit `Cmd+Shift+R` to start recording, or double-tap `Shift` for quick access.
+- Multiple model sizes (tiny to large) for speed/accuracy tradeoffs
+- Auto-language detection or manual selection
+- Smart audio processing for optimal transcription quality
 
 ---
 
-## 🌟 Powerful Features That Set Us Apart
+## 📋 Table of Contents
 
-### 🎯 **Smart Recording Modes**
-- **Traditional Mode**: Record → Transcribe → Click to paste anywhere
-- **Live Streaming**: Speak continuously, text appears in real-time
-- **Voice Activity Detection**: Automatically starts/stops with your speech
-- **Double-Key Shortcuts**: Double-tap Shift (record) or Control (live mode)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Usage](#-usage)
+- [Configuration](#️-configuration)
+- [Commands Reference](#-commands-reference)
+- [Troubleshooting](#-troubleshooting)
+- [How It Works](#-how-it-works)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-### 🌍 **Universal Language Support**
-- **11+ Languages**: English, French, Spanish, German, Italian, Portuguese, and more
-- **Auto-Detection**: Automatically detects what language you're speaking
-- **Mixed Conversations**: Seamlessly handles switching between languages
-- **Accent Friendly**: Trained on diverse voice patterns and accents
+---
 
-### 🔧 **Professional Customization**
-- **Multiple AI Models**: Choose between speed (small) and accuracy (large-v3)
-- **GPU + CPU Optimized**: Faster-whisper (GPU) or whisper.cpp (CPU) engines
-- **Smart Chunking**: Natural speech boundaries prevent mid-word cuts
-- **Configurable Hotkeys**: Set your preferred keyboard shortcuts
+## 🔧 Installation
 
-### 🎨 **Seamless Integration**
-- **Works Everywhere**: Slack, Email, Notion, Terminal, any macOS app
-- **Intelligent Pasting**: Preserves your clipboard, restores after pasting
-- **Background Operation**: Minimal system resources, runs quietly
-- **International Keyboards**: Full support for AZERTY, QWERTZ, and more  
+### Prerequisites
 
-## 🚀 Quick Start
+- **macOS** (tested on macOS 10.15+)
+- **Homebrew** package manager
+- **whisper-cpp** for transcription engine
 
-### Global Installation (Recommended)
+### Step 1: Install whisper-cpp
 
-1. **Setup the project:**
+```bash
+brew install whisper-cpp
+```
+
+### Step 2: Install OpenScribe
+
+**Option A: From Source** (recommended for development)
+
+```bash
+# Clone the repository
+git clone https://github.com/alexandrelam/openscribe-go.git
+cd openscribe-go
+
+# Build and install
+make build
+make install
+```
+
+**Option B: Download Binary** (coming soon)
+
+Pre-built binaries will be available in the [Releases](https://github.com/alexandrelam/openscribe-go/releases) section.
+
+### Step 3: First-Time Setup
+
+Run the setup command to download the default Whisper model:
+
+```bash
+openscribe setup
+```
+
+This will:
+- Verify whisper-cpp installation
+- Download the small Whisper model (~500MB)
+- Create configuration directories
+- Set up default preferences
+
+### Step 4: Grant Permissions
+
+OpenScribe requires two macOS permissions:
+
+**Microphone Access**
+- macOS will prompt you automatically when you first start recording
+- Grant permission to allow audio recording
+
+**Accessibility Access** (for auto-paste feature)
+1. Open **System Preferences** → **Security & Privacy** → **Accessibility**
+2. Click the lock icon to make changes
+3. Add `openscribe` to the list of allowed apps
+4. Check the box next to `openscribe`
+
+---
+
+## 🎯 Quick Start
+
+1. **Start OpenScribe:**
    ```bash
-   cd speech-to-text
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
+   openscribe start
    ```
 
-2. **Install globally:**
-   ```bash
-   ./install.sh
-   ```
+2. **Record and transcribe:**
+   - Double-press **Right Option** key to start recording (you'll hear a beep)
+   - Speak your message
+   - Double-press **Right Option** again to stop recording (you'll hear a different beep)
+   - Wait for transcription (you'll hear a completion sound)
+   - Your text will automatically appear at your cursor!
 
-3. **Use from anywhere:**
-   ```bash
-   vibe              # Launch GUI interface
-   vibe --cli        # Launch CLI interface  
-   vibe-cli          # Direct CLI access
-   vibe --help       # Show help information
-   vibe --version    # Show version info
-   ```
+3. **Stop OpenScribe:**
+   - Press `Ctrl+C` in the terminal
 
-### Development Installation
+**That's it!** You're now ready to use speech-to-text anywhere on your Mac.
 
-For development or testing without global installation:
-
-1. **Install dependencies:**
-   ```bash
-   # On macOS
-   brew install python-tk
-   
-   # On Ubuntu/Debian
-   sudo apt-get install python3-tk
-   
-   pip install -r requirements.txt
-   ```
-
-2. **Test components:**
-   ```bash
-   python test_components.py
-   ```
-
-3. **Run locally:**
-   ```bash
-   python main.py      # GUI version
-   python main_cli.py  # CLI version
-   ```
+---
 
 ## 📖 Usage
 
-### Command Line Interface
-
-After global installation, use these commands from any terminal:
+### Basic Recording
 
 ```bash
-# Launch GUI interface (default)
-vibe
+# Start with default settings
+openscribe start
 
-# Launch CLI interface
-vibe --cli
+# Start with a specific microphone
+openscribe start --microphone "MacBook Pro Microphone"
 
-# Direct CLI access
-vibe-cli
+# Start with a specific model
+openscribe start --model base  # faster but less accurate
+openscribe start --model large # slower but more accurate
 
-# Show help
-vibe --help
+# Start with a specific language
+openscribe start --language en  # English
+openscribe start --language es  # Spanish
+openscribe start --language fr  # French
 
-# Show version
-vibe --version
+# Disable auto-paste (only show text in terminal)
+openscribe start --no-paste
+
+# Enable verbose output for debugging
+openscribe start --verbose
 ```
 
-### GUI Interface
-
-1. **Traditional Recording Mode:**
-   - Click "🎤 Start Recording" or press Cmd+Shift+R
-   - **NEW: Double-tap Shift** for quick activation
-   - Speak into your microphone
-   - Click "⏹️ Stop Recording" or press Cmd+Shift+R again (or double-tap Shift)
-   - Click to insert text into focused input field
-
-2. **Live Streaming Mode:**
-   - Click "🔴 Live Mode"
-   - **NEW: Double-tap Control** for quick activation
-   - Speak continuously
-   - Text appears in real-time at cursor position
-   - Click "⏹️ Stop Live" to end (or double-tap Control)
-
-3. **Configuration:**
-   - Click "Settings" to configure:
-     - **Language**: Auto-detection or specific language (English, French, etc.)
-     - **Model Size**: Balance between speed and accuracy
-     - **VAD Parameters**: Speech detection sensitivity
-     - **Paste Behavior**: Clipboard method and timing
-     - **Double Key Shortcuts**: Enable/disable and timing (default 500ms)
-
-### CLI Interface
+### Workflow Example
 
 ```bash
-# Traditional CLI usage
-vibe --cli
+$ openscribe start
+Using microphone: MacBook Pro Microphone
+Using model: small
+Language: auto-detect
+Hotkey: Right Option (double-press)
+Audio feedback: enabled
+Ready! Press hotkey to start recording...
 
-# Interactive prompts guide you through:
-# - Press ENTER to start recording
-# - Speak into microphone
-# - Press ENTER to stop and transcribe
-# - Choose to insert text or copy to clipboard
+[Double-press Right Option]
+🔴 Recording... (press hotkey again to stop)
+
+[Double-press Right Option]
+⏹  Recording stopped. Transcribing...
+✅ Transcription: "Hello, this is a test of OpenScribe."
+📝 Text pasted to cursor position!
+
+[2025-01-15 14:23:45] Logged to ~/Library/Logs/openscribe/transcriptions.log
 ```
 
-## 🗂️ Project Structure
+---
 
-```
-speech-to-text/
-├── install.sh                    # Global installation script  
-├── uninstall.sh                  # Global uninstallation script
-├── download_whisper_models.sh    # Whisper.cpp model download script
-├── main.py                       # GUI application entry point
-├── main_cli.py                   # CLI version 
-├── test_components.py            # Component testing script
-├── requirements.txt              # Python dependencies
-├── config.json                   # User configuration (auto-generated)
-├── src/
-│   ├── __init__.py
-│   ├── gui.py                   # Main tkinter GUI with settings
-│   ├── audio_recorder.py        # VAD-based audio recording  
-│   ├── transcription.py         # Multilingual whisper engine with provider support
-│   ├── text_inserter.py         # Clipboard-based text insertion
-│   ├── vad_chunker.py           # Voice Activity Detection
-│   ├── double_key_shortcuts.py  # Double key press detection
-│   ├── config.py                # Configuration management
-│   └── providers/               # Whisper provider implementations
-│       ├── __init__.py          # Provider availability checks
-│       ├── base_provider.py     # Abstract base provider class
-│       ├── faster_whisper_provider.py  # Default GPU-optimized provider
-│       └── whisper_cpp_provider.py     # CPU-optimized CLI provider
-└── venv/                        # Virtual environment
-```
+## ⚙️ Configuration
 
-## 🔄 Management Commands
-
-### Installation Management
-```bash
-# Install globally (run from project directory)
-./install.sh
-
-# Check installation status  
-vibe --version
-
-# Uninstall globally
-./uninstall.sh                    # Interactive removal
-./uninstall.sh --force           # Force removal
-```
-
-### Troubleshooting Installation
-```bash
-# Reinstall if issues occur
-./uninstall.sh --force
-./install.sh
-
-# Check if vibe is in PATH
-which vibe
-
-# Manual verification
-ls -la ~/.local/bin/vibe*
-```
-
-## 🔧 Dependencies
-
-### Core Dependencies
-- **sounddevice**: High-quality audio recording from microphone
-- **faster-whisper**: Offline speech recognition with multilingual support (default provider)
-- **webrtcvad**: Voice Activity Detection for intelligent chunking
-- **pyperclip**: Clipboard operations for text insertion
-- **pynput**: Global hotkey support
-- **soundfile**: Audio file processing
-- **tkinter**: GUI framework (system dependent)
-
-### Additional Dependencies  
-- **pyautogui**: Fallback text insertion method
-- **numpy**: Audio data processing
-
-### Optional: Whisper.cpp Provider
-For CPU-optimized transcription using the whisper.cpp implementation:
+### View Current Configuration
 
 ```bash
-# Install whisper.cpp via Homebrew (macOS)
-brew install whisper-cpp
-
-# Download Whisper models (required for whisper.cpp)
-# See "Whisper.cpp Model Setup" section below
+openscribe config --show
 ```
 
-## 🤖 Whisper.cpp Model Setup
-
-The application supports two Whisper providers:
-- **faster-whisper** (default): GPU-optimized, models downloaded automatically
-- **whisper.cpp**: CPU-optimized, requires manual model download
-
-### Installing Whisper.cpp Provider
-
-1. **Install whisper.cpp:**
-   ```bash
-   # macOS (Homebrew)
-   brew install whisper-cpp
-   
-   # Linux (build from source)
-   git clone https://github.com/ggerganov/whisper.cpp.git
-   cd whisper.cpp
-   make
-   ```
-
-2. **Download Whisper Models:**
-   
-   The application will automatically look for models in these locations:
-   - `~/whisper-models/` (recommended)
-   - `/opt/homebrew/share/whisper-cpp/`
-   - `~/.whisper-cpp/models/`
-   
-   **Quick Setup - Automated Model Download:**
-   ```bash
-   # Use the included download script (recommended)
-   ./download_whisper_models.sh
-   
-   # Or download specific models directly
-   ./download_whisper_models.sh small-en base-en
-   
-   # See available models
-   ./download_whisper_models.sh list
-   ```
-   
-   **Manual Download (Alternative):**
-   ```bash
-   # Create models directory
-   mkdir -p ~/whisper-models
-   cd ~/whisper-models
-   
-   # Download English-optimized models (faster)
-   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
-   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-   
-   # Download multilingual models (supports all languages)
-   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
-   curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
-   ```
-
-### Available Model Sizes
-
-| Model | File Size | Speed | Accuracy | Languages |
-|-------|-----------|--------|----------|-----------|
-| `ggml-tiny.en.bin` | ~39 MB | Fastest | Basic | English only |
-| `ggml-base.en.bin` | ~148 MB | Fast | Good | English only |
-| `ggml-small.en.bin` | ~488 MB | Medium | Better | English only |
-| `ggml-tiny.bin` | ~39 MB | Fastest | Basic | Multilingual |
-| `ggml-base.bin` | ~148 MB | Fast | Good | Multilingual |
-| `ggml-small.bin` | ~488 MB | Medium | Better | Multilingual |
-| `ggml-medium.bin` | ~1.5 GB | Slow | Great | Multilingual |
-| `ggml-large-v3.bin` | ~3.1 GB | Slowest | Best | Multilingual |
-
-### Model Download Script Usage
-
-The included `download_whisper_models.sh` script simplifies model management:
+### Configure Microphone
 
 ```bash
-# Interactive mode - shows available models and prompts for selection
-./download_whisper_models.sh
+# List available microphones
+openscribe config --list-microphones
 
-# Download specific models
-./download_whisper_models.sh small-en base-en tiny
-
-# Download all models (~6GB total)
-./download_whisper_models.sh all
-
-# List available models
-./download_whisper_models.sh list
-
-# Show currently downloaded models
-./download_whisper_models.sh status
-
-# Get help
-./download_whisper_models.sh help
+# Set default microphone
+openscribe config --set-microphone "MacBook Pro Microphone"
 ```
 
-**Script Features:**
-- ✅ Interactive model selection with progress bars
-- ✅ Automatic model directory creation (`~/whisper-models`)
-- ✅ Overwrite protection (prompts before replacing existing files)
-- ✅ Download verification and error handling
-- ✅ Compatible with bash 3.2+ (macOS default)
-- ✅ Shows model sizes, speeds, and language support
+### Configure Model
 
-### Manual Model Download URLs
-
-If you prefer manual download, all models are available from the Hugging Face repository:
 ```bash
-# Base URL
-https://huggingface.co/ggerganov/whisper.cpp/resolve/main/
-
-# Examples:
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
+# Set default model
+openscribe config --set-model small
 ```
 
-### Using the Whisper.cpp Provider
+Available models:
+- `tiny` - Fastest, least accurate (~75MB)
+- `base` - Fast, good for simple speech (~145MB)
+- `small` - **Recommended** - Balanced speed/accuracy (~500MB)
+- `medium` - Slower, more accurate (~1.5GB)
+- `large` - Slowest, most accurate (~3GB)
 
-1. **In GUI**: Go to Settings → Whisper Provider → Select "Whisper.cpp"
-2. **Automatic Fallback**: If your requested model isn't found, the app automatically falls back to available models
-3. **Model Priority**: The app searches for models in this order:
-   - Exact model requested
-   - Available English models (if language is English)
-   - Available multilingual models
-   - Test model (last resort)
+### Configure Language
 
-### Troubleshooting Whisper.cpp
-
-**"Whisper-cli command not found":**
 ```bash
-# Check if whisper-cli is installed
-which whisper-cli
+# Set default language
+openscribe config --set-language en  # English
+openscribe config --set-language auto  # Auto-detect
+```
 
-# macOS: Install via Homebrew
+### Configure Hotkey
+
+```bash
+# List available hotkeys
+openscribe config --list-hotkeys
+
+# Set activation hotkey
+openscribe config --set-hotkey "Right Option"
+openscribe config --set-hotkey "Left Shift"
+openscribe config --set-hotkey "Right Command"
+```
+
+### Audio Feedback
+
+```bash
+# Enable audio feedback (beeps for start/stop/complete)
+openscribe config --enable-audio-feedback
+
+# Disable audio feedback
+openscribe config --disable-audio-feedback
+
+# List available system sounds
+openscribe config --list-sounds
+
+# Test audio feedback sounds
+openscribe config --test-sounds
+```
+
+### Configuration File
+
+All settings are stored in:
+```
+~/Library/Application Support/openscribe/config.yaml
+```
+
+You can edit this file directly if needed. Example:
+
+```yaml
+microphone: "MacBook Pro Microphone"
+model: "small"
+language: "auto"
+hotkey: "Right Option"
+audio_feedback: true
+start_sound: "Tink"
+stop_sound: "Pop"
+complete_sound: "Glass"
+```
+
+---
+
+## 📚 Commands Reference
+
+### Main Commands
+
+| Command | Description |
+|---------|-------------|
+| `openscribe start` | Start the transcription service |
+| `openscribe setup` | Download default model and verify installation |
+| `openscribe config` | Manage configuration settings |
+| `openscribe models` | Manage Whisper models |
+| `openscribe logs` | View transcription history |
+| `openscribe version` | Show version information |
+
+### Start Command Flags
+
+| Flag | Description |
+|------|-------------|
+| `-m, --microphone` | Override microphone selection |
+| `--model` | Override model selection |
+| `-l, --language` | Override language setting |
+| `--no-paste` | Disable auto-paste feature |
+| `-v, --verbose` | Enable verbose debug output |
+
+### Config Command Flags
+
+| Flag | Description |
+|------|-------------|
+| `--show` | Display current configuration |
+| `--list-microphones` | List available microphones |
+| `--set-microphone` | Set default microphone |
+| `--set-model` | Set default model |
+| `--set-language` | Set default language |
+| `--set-hotkey` | Configure activation hotkey |
+| `--list-hotkeys` | List available hotkeys |
+| `--enable-audio-feedback` | Enable audio feedback |
+| `--disable-audio-feedback` | Disable audio feedback |
+| `--list-sounds` | List available system sounds |
+| `--test-sounds` | Test audio feedback sounds |
+
+### Models Commands
+
+| Command | Description |
+|---------|-------------|
+| `openscribe models list` | List downloaded models |
+| `openscribe models download <model>` | Download a specific model |
+
+Available models: `tiny`, `base`, `small`, `medium`, `large`
+
+### Logs Commands
+
+| Command | Description |
+|---------|-------------|
+| `openscribe logs show` | Display recent transcriptions |
+| `openscribe logs show -n 10` | Show last 10 transcriptions |
+| `openscribe logs clear` | Clear transcription history |
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**"No Whisper models found!"**
+```bash
+# Run setup to download the default model
+openscribe setup
+
+# Or download a specific model
+openscribe models download small
+```
+
+**"whisper-cpp is not installed"**
+```bash
+# Install whisper-cpp via Homebrew
 brew install whisper-cpp
 ```
 
-**"No speech detected" with proper audio:**
-```bash
-# Verify model file exists and is valid
-ls -la ~/whisper-models/
-file ~/whisper-models/ggml-small.en.bin
+**"Microphone permission denied"**
+- Go to **System Preferences** → **Security & Privacy** → **Privacy** → **Microphone**
+- Check the box next to `openscribe` or your terminal application
 
-# Test with whisper-cli directly
-echo "test" | whisper-cli -m ~/whisper-models/ggml-small.en.bin
+**"Accessibility permission denied" / Auto-paste not working**
+- Go to **System Preferences** → **Security & Privacy** → **Accessibility**
+- Click the lock icon to make changes
+- Add `openscribe` or your terminal application to the list
+- Check the box to enable it
+
+**Hotkey not detected**
+- Make sure OpenScribe has Accessibility permissions (see above)
+- Try a different hotkey with `openscribe config --set-hotkey "Left Shift"`
+- Check for conflicts with other apps using the same hotkey
+
+**Poor transcription quality**
+- Try a larger model: `openscribe config --set-model medium`
+- Specify your language: `openscribe start --language en`
+- Make sure you're in a quiet environment
+- Speak clearly and at a moderate pace
+- Check microphone selection: `openscribe config --list-microphones`
+
+**Transcription is slow**
+- Use a smaller model: `openscribe config --set-model base`
+- Close other resource-intensive applications
+- Note: First transcription is slower due to model loading
+
+For more detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+---
+
+## 🔍 How It Works
+
+OpenScribe combines several technologies to provide seamless speech-to-text:
+
+1. **Global Hotkey Detection**: Uses macOS Carbon Event Manager APIs to detect double-press of your configured hotkey
+2. **Audio Recording**: Captures audio from your selected microphone using Go audio libraries with macOS Core Audio
+3. **Speech Recognition**: Transcribes audio using [whisper.cpp](https://github.com/ggerganov/whisper.cpp), a high-performance C++ implementation of OpenAI's Whisper
+4. **Text Injection**: Simulates keyboard input using CGEvent APIs to paste text at your cursor (not clipboard-based!)
+5. **Audio Feedback**: Plays distinct system sounds for each state transition
+6. **Logging**: Saves all transcriptions with timestamps to `~/Library/Logs/openscribe/transcriptions.log`
+
+### File Locations
+
+```
+/opt/homebrew/bin/openscribe                          # Binary (if installed via Homebrew)
+~/Library/Application Support/openscribe/             # Configuration and models
+  ├── config.yaml                                      # Configuration file
+  └── models/                                          # Downloaded Whisper models
+~/Library/Caches/openscribe/                          # Temporary audio files
+~/Library/Logs/openscribe/                            # Log files
+  └── transcriptions.log                               # Transcription history
 ```
 
-**Model not found errors:**
-```bash
-# Check current models
-ls -la ~/whisper-models/
+---
 
-# Download missing model
-cd ~/whisper-models
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+## 🤝 Contributing
+
+Contributions are welcome! Here's how you can help:
+
+1. **Report bugs**: Open an issue with details about the problem
+2. **Suggest features**: Open an issue with your feature request
+3. **Submit PRs**: Fork the repo, make changes, and submit a pull request
+4. **Improve documentation**: Help make the docs better
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/alexandrelam/openscribe-go.git
+cd openscribe-go
+
+# Install dependencies
+make deps
+
+# Build
+make build
+
+# Run
+make run
+
+# Run tests
+make test
+
+# Format code
+make fmt
+
+# Run linter
+make lint
 ```
 
-## 🔒 Privacy & Security
+### Project Structure
 
-**Complete Privacy-focused Design:**
-- **100% Offline Processing**: All transcription happens locally using faster-whisper
-- **No Internet Required**: No data sent to external services (Google, OpenAI, etc.)
-- **No Audio Storage**: Temporary audio files deleted immediately after processing
-- **Clipboard Protection**: Original clipboard content automatically backed up and restored
-- **Local Configuration**: All settings stored locally in `config.json`
-
-## 🛠️ Troubleshooting
-
-### Installation Issues
-```bash
-# If vibe command not found
-echo $PATH | grep "local/bin"  # Check if ~/.local/bin is in PATH
-export PATH="$HOME/.local/bin:$PATH"  # Add to PATH temporarily
-# Add to ~/.bashrc or ~/.zshrc for permanent fix
-
-# If installation fails
-./uninstall.sh --force
-rm -rf venv/
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-./install.sh
+```
+openscribe-go/
+├── cmd/                    # Application entry point
+├── internal/               # Private application code
+│   ├── audio/             # Audio recording and feedback
+│   ├── config/            # Configuration management
+│   ├── hotkey/            # Hotkey detection (macOS)
+│   ├── keyboard/          # Keyboard simulation (macOS)
+│   ├── logger/            # Logging and history
+│   ├── models/            # Model management
+│   └── transcription/     # Whisper integration
+├── assets/                 # Static resources
+├── docs/                   # Documentation
+└── scripts/                # Build and installation scripts
 ```
 
-### Microphone Issues
-- **macOS**: Grant microphone permissions in System Preferences → Security & Privacy → Microphone
-- **Windows**: Check microphone permissions in Settings → Privacy → Microphone
-- **Linux**: Ensure user is in audio group: `sudo usermod -a -G audio $USER`
+---
 
-### Text Insertion Issues
-- **macOS**: Grant accessibility permissions in System Preferences → Security & Privacy → Accessibility
-- **Windows**: Run as administrator if clipboard operations fail
-- **Linux**: Install xclip for clipboard support: `sudo apt-get install xclip`
+## 📄 License
 
-### VAD (Voice Activity Detection) Issues
-- **Sensitivity**: Adjust VAD aggressiveness in Settings (0=least sensitive, 3=most sensitive)
-- **Background Noise**: Use higher aggressiveness (2-3) in noisy environments
-- **Quiet Speech**: Use lower aggressiveness (0-1) for quiet or distant speech
+OpenScribe is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-### Language Detection Issues
-- **Auto-detection Problems**: Switch to specific language in Settings instead of "Automatic Detection"
-- **Mixed Languages**: Use "Automatic Detection" mode for conversations switching between languages
-- **Model Loading**: First run may be slow as faster-whisper downloads language models
+---
 
-### Performance Issues
-- **Slow Transcription**: Switch to "small" model size in Settings for better speed
-- **High Accuracy Needed**: Switch to "large-v3" model (requires more RAM and processing time)
-- **Memory Issues**: Restart the application if it becomes unresponsive after extended use
+## 🙏 Acknowledgments
 
-## 🚀 Advanced Features Implemented
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance Whisper implementation by Georgi Gerganov
+- [OpenAI Whisper](https://github.com/openai/whisper) - Original Whisper model
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
 
-✅ **Offline Speech Recognition**: Complete privacy with faster-whisper  
-✅ **Multiple Language Support**: 11+ languages with auto-detection  
-✅ **Real-time Transcription**: Live streaming mode with instant text insertion  
-✅ **Voice Activity Detection**: Intelligent chunking for 60-80% performance improvement  
-✅ **Advanced Text Insertion**: Clipboard-based with backup/restore  
-✅ **Double Key Press Shortcuts**: Quick activation with double Shift/Control  
-✅ **Global Command Access**: Install once, use `vibe` from anywhere  
-✅ **Comprehensive Settings**: Language, model size, VAD parameters, paste behavior  
+---
 
-## 🔮 Future Enhancements
+## 📞 Support
 
-- [ ] Audio playback for verification before insertion
-- [ ] Transcription history and session management
-- [ ] System tray integration for background operation
-- [ ] Plugin system for custom text processing
-- [ ] Batch file transcription mode
-- [ ] Real-time translation between languages
-- [ ] Voice commands for application control
-- [ ] Custom hotkey configuration in GUI (partially implemented with double key shortcuts)
+- **Issues**: [GitHub Issues](https://github.com/alexandrelam/openscribe-go/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/alexandrelam/openscribe-go/discussions)
 
-## License
+---
 
-MIT License - see LICENSE file for details.
+<div align="center">
+
+**Made with ❤️ for the open-source community**
+
+[⭐ Star this repo](https://github.com/alexandrelam/openscribe-go) | [🐛 Report a bug](https://github.com/alexandrelam/openscribe-go/issues) | [💡 Request a feature](https://github.com/alexandrelam/openscribe-go/issues)
+
+</div>

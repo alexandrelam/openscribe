@@ -1,81 +1,42 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+*.dylib
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv/
-.env/
+# Test binary, built with `go test -c`
+*.test
 
-# IDE
+# Output of the go coverage tool
+*.out
+*.prof
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Go build cache
+.cache/
+
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
-# Audio files (temporary)
-*.wav
-*.mp3
-*.aac
-*.flac
-temp_audio.*
+# Build output
+/bin/
+/dist/
+/build/
 
-# Logs
-*.log
-logs/
+# Debug files
+__debug_bin
 
-# Configuration (if sensitive)
-config.json
-settings.json
-
-# Model files (if using local models)
-models/
-*.bin
-*.onnx
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-
-# pytest
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
+# Air live reload tool
+tmp/

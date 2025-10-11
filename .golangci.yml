@@ -1,0 +1,22 @@
+# golangci-lint configuration for OpenScribe
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+
+  disable:
+    - exhaustive
+    - exhaustruct
+    - varnamelen
