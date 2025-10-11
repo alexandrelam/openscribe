@@ -1,7 +1,6 @@
 # golangci-lint configuration for OpenScribe
-# Documentation: https://golangci-lint.run/usage/configuration/
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -9,75 +8,15 @@ run:
 
 linters:
   enable:
-    # Default linters (enabled automatically)
-    - errcheck      # Check for unchecked errors
-    - govet         # Reports suspicious constructs
-    - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Static analysis checks (includes gosimple)
-    - unused        # Check for unused code
-
-    # Additional linters
-    - misspell      # Spell checker
-    - revive        # Fast, configurable, extensible linter
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
 
   disable:
-    - exhaustive    # Too strict for switch statements
-    - exhaustruct   # Too strict for struct initialization
-    - varnamelen    # Variable name length (too opinionated)
-
-formatters:
-  enable:
-    - gofmt         # Check if code is gofmt'd
-    - goimports     # Check if imports are formatted
-
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
-
-  govet:
-    enable:
-      - shadow
-    disable:
-      - shadow
-
-  revive:
-    rules:
-      - name: var-naming
-        disabled: false
-      - name: exported
-        disabled: false
-
-  gofmt:
-    simplify: true
-
-  goimports:
-    local-prefixes: github.com/alexandrelam/openscribe
-
-issues:
-  exclude-dirs:
-    - vendor
-    - testdata
-  exclude-files:
-    - ".*_test.go"
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-
-    # Exclude deprecated warnings for now
-    - linters:
-        - staticcheck
-      text: "SA1019:"
-
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
-output:
-  formats:
-    colored-line-number:
-      path: stdout
-  print-issued-lines: true
-  print-linter-name: true
+    - exhaustive
+    - exhaustruct
+    - varnamelen
