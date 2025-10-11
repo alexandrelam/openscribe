@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
@@ -17,6 +18,7 @@ var configCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, _ []string) {
 		// If no flags are provided, show help
 		if !cmd.Flags().Changed("show") &&
+			!cmd.Flags().Changed("open") &&
 			!cmd.Flags().Changed("list-microphones") &&
 			!cmd.Flags().Changed("list-hotkeys") &&
 			!cmd.Flags().Changed("list-sounds") &&
@@ -28,6 +30,12 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("enable-audio-feedback") &&
 			!cmd.Flags().Changed("disable-audio-feedback") {
 			_ = cmd.Help()
+			return
+		}
+
+		// Handle --open flag
+		if cmd.Flags().Changed("open") {
+			handleOpenConfig()
 			return
 		}
 
@@ -107,6 +115,33 @@ func handleShowConfig() {
 	}
 
 	fmt.Print(cfg.String())
+}
+
+func handleOpenConfig() {
+	// Ensure config exists (this will create it with defaults if it doesn't exist)
+	_, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Get the config file path
+	configPath, err := config.GetConfigPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting config path: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Open the config file with the default editor using macOS 'open' command
+	fmt.Printf("Opening config file: %s\n", configPath)
+	cmd := exec.Command("open", configPath)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening config file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "You can manually open the file at: %s\n", configPath)
+		os.Exit(1)
+	}
+
+	fmt.Println("Config file opened in default editor.")
 }
 
 func handleListMicrophones() {
@@ -297,6 +332,7 @@ func init() {
 
 	// Add flags for the config command
 	configCmd.Flags().Bool("show", false, "Display current configuration")
+	configCmd.Flags().Bool("open", false, "Open configuration file in default editor")
 	configCmd.Flags().Bool("list-microphones", false, "List available microphones")
 	configCmd.Flags().Bool("list-hotkeys", false, "List available hotkeys")
 	configCmd.Flags().Bool("list-sounds", false, "List available system sounds")

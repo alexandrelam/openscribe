@@ -582,7 +582,12 @@ View current configuration:
 openscribe config --show
 ```
 
-Configuration file location:
+Open configuration file in editor:
+```bash
+openscribe config --open
+```
+
+Or view configuration file directly:
 ```bash
 cat ~/Library/Application\ Support/openscribe/config.yaml
 ```

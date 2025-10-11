@@ -211,11 +211,13 @@ openscribe start --verbose
 
 ```bash
 $ openscribe start
-Using microphone: MacBook Pro Microphone
-Using model: small
-Language: auto-detect
-Hotkey: Right Option (double-press)
-Audio feedback: enabled
+OpenScribe v1.0.0 Starting...
+  Build:           abc1234 (2025-10-11)
+  Microphone:      MacBook Pro Microphone
+  Model:           small
+  Language:        auto-detect
+  Hotkey:          Right Option (double-press)
+  Audio feedback:  enabled
 Ready! Press hotkey to start recording...
 
 [Double-press Right Option]
@@ -238,6 +240,15 @@ Ready! Press hotkey to start recording...
 ```bash
 openscribe config --show
 ```
+
+### Edit Configuration File
+
+```bash
+# Open config file in default editor
+openscribe config --open
+```
+
+This will open `~/Library/Application Support/openscribe/config.yaml` in your default editor (TextEdit, VS Code, etc.).
 
 ### Configure Microphone
 
@@ -306,7 +317,7 @@ All settings are stored in:
 ~/Library/Application Support/openscribe/config.yaml
 ```
 
-You can edit this file directly if needed. Example:
+You can edit this file directly using `openscribe config --open` or with any text editor. Example:
 
 ```yaml
 microphone: "MacBook Pro Microphone"
@@ -349,6 +360,7 @@ complete_sound: "Glass"
 | Flag | Description |
 |------|-------------|
 | `--show` | Display current configuration |
+| `--open` | Open configuration file in default editor |
 | `--list-microphones` | List available microphones |
 | `--set-microphone` | Set default microphone |
 | `--set-model` | Set default model |
