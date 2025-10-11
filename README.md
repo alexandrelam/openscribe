@@ -11,7 +11,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
-[![macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
+[![macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey.svg)](https://www.apple.com/macos/)
 
 ---
 
@@ -71,9 +71,11 @@
 
 ### Prerequisites
 
-- **macOS** (tested on macOS 10.15+)
+- **macOS** on Apple Silicon (M1/M2/M3/M4) - ARM64 only
 - **Homebrew** package manager
 - **whisper-cpp** for transcription engine
+
+> **Note:** OpenScribe currently only supports Apple Silicon Macs (M1/M2/M3/M4). Intel Macs are not supported.
 
 ### Step 1: Install whisper-cpp
 
@@ -107,19 +109,15 @@ make install
 
 **Option C: Download Binary**
 
-Pre-built binaries are available in the [Releases](https://github.com/alexandrelam/openscribe/releases) section:
+Pre-built binaries for Apple Silicon are available in the [Releases](https://github.com/alexandrelam/openscribe/releases) section:
 
 ```bash
-# Download the latest release for your architecture
-# For Apple Silicon (M1/M2/M3):
+# Download the latest release for Apple Silicon (M1/M2/M3/M4)
 curl -L https://github.com/alexandrelam/openscribe/releases/latest/download/openscribe-darwin-arm64.tar.gz -o openscribe.tar.gz
-
-# For Intel Macs:
-curl -L https://github.com/alexandrelam/openscribe/releases/latest/download/openscribe-darwin-amd64.tar.gz -o openscribe.tar.gz
 
 # Extract and install
 tar -xzf openscribe.tar.gz
-sudo mv openscribe-darwin-* /usr/local/bin/openscribe
+sudo mv openscribe-darwin-arm64 /usr/local/bin/openscribe
 chmod +x /usr/local/bin/openscribe
 ```
 

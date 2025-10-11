@@ -31,21 +31,15 @@ build:
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/openscribe
 
-# Build for macOS ARM64
+# Build for macOS ARM64 (Apple Silicon)
 build-darwin-arm64:
-	@echo "Building $(BINARY_NAME) $(VERSION) for macOS ARM64..."
+	@echo "Building $(BINARY_NAME) $(VERSION) for macOS ARM64 (Apple Silicon)..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/openscribe
 
-# Build for macOS x86_64
-build-darwin-amd64:
-	@echo "Building $(BINARY_NAME) $(VERSION) for macOS x86_64..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/openscribe
-
-# Build all architectures
-build-all: build-darwin-arm64 build-darwin-amd64
-	@echo "All builds complete!"
+# Build all architectures (only ARM64 for Apple Silicon)
+build-all: build-darwin-arm64
+	@echo "Build complete!"
 
 # Install the binary to GOPATH/bin
 install: build
@@ -87,9 +81,8 @@ lint:
 help:
 	@echo "OpenScribe Makefile Commands:"
 	@echo "  make build               - Build the binary"
-	@echo "  make build-darwin-arm64  - Build for macOS ARM64"
-	@echo "  make build-darwin-amd64  - Build for macOS x86_64"
-	@echo "  make build-all           - Build all architectures"
+	@echo "  make build-darwin-arm64  - Build for macOS ARM64 (Apple Silicon)"
+	@echo "  make build-all           - Build for Apple Silicon"
 	@echo "  make install             - Install the binary to GOPATH/bin"
 	@echo "  make run                 - Build and run the application"
 	@echo "  make clean               - Remove build artifacts"
@@ -98,5 +91,7 @@ help:
 	@echo "  make fmt                 - Format code"
 	@echo "  make lint                - Run linter"
 	@echo "  make help                - Display this help message"
+	@echo ""
+	@echo "Note: OpenScribe only supports macOS Apple Silicon (M1/M2/M3/M4)"
 
-.PHONY: build build-darwin-arm64 build-darwin-amd64 build-all install run clean test deps fmt lint help
+.PHONY: build build-darwin-arm64 build-all install run clean test deps fmt lint help

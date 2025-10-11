@@ -50,31 +50,27 @@ git push origin v0.1.0
 ```
 
 This will trigger the GitHub Actions workflow (`.github/workflows/release.yml`) which:
-- Builds binaries for both ARM64 and x86_64
-- Creates tar.gz archives
-- Generates SHA256 checksums
+- Builds binary for ARM64 (Apple Silicon)
+- Creates tar.gz archive
+- Generates SHA256 checksum
 - Creates a GitHub release with all artifacts
 
-### 4. Update the Formula with SHA256 Checksums
+> **Note:** OpenScribe only supports macOS Apple Silicon (M1/M2/M3/M4). Intel Macs are not supported.
 
-After the release is created, download the SHA256 files and update the formula:
+### 4. Update the Formula with SHA256 Checksum
+
+After the release is created, download the SHA256 file and update the formula:
 
 ```bash
-# Get the checksums from the release
+# Get the checksum from the release
 curl -L https://github.com/alexandrelam/openscribe/releases/download/v0.1.0/openscribe-darwin-arm64.tar.gz.sha256
-curl -L https://github.com/alexandrelam/openscribe/releases/download/v0.1.0/openscribe-darwin-amd64.tar.gz.sha256
 ```
 
-Update `openscribe.rb` with the actual SHA256 values:
+Update `openscribe.rb` with the actual SHA256 value:
 
 ```ruby
-if Hardware::CPU.arm?
-  url "https://github.com/alexandrelam/openscribe/releases/download/v0.1.0/openscribe-darwin-arm64.tar.gz"
-  sha256 "actual_arm64_sha256_here"
-else
-  url "https://github.com/alexandrelam/openscribe/releases/download/v0.1.0/openscribe-darwin-amd64.tar.gz"
-  sha256 "actual_amd64_sha256_here"
-end
+url "https://github.com/alexandrelam/openscribe/releases/download/v0.1.0/openscribe-darwin-arm64.tar.gz"
+sha256 "actual_arm64_sha256_here"
 ```
 
 ### 5. Commit and Push the Formula
@@ -129,16 +125,15 @@ When you release a new version:
 
 2. Wait for the GitHub Actions workflow to complete and create the release
 
-3. Get the new SHA256 checksums:
+3. Get the new SHA256 checksum:
    ```bash
    curl -L https://github.com/alexandrelam/openscribe/releases/download/v0.2.0/openscribe-darwin-arm64.tar.gz.sha256
-   curl -L https://github.com/alexandrelam/openscribe/releases/download/v0.2.0/openscribe-darwin-amd64.tar.gz.sha256
    ```
 
 4. Update the formula in `homebrew-openscribe`:
    ```ruby
    version "0.2.0"
-   # Update URLs and SHA256s
+   # Update URL and SHA256
    ```
 
 5. Commit and push:

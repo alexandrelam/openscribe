@@ -1,26 +1,18 @@
 class Openscribe < Formula
-  desc "Real-time speech transcription CLI for macOS with hotkey activation"
+  desc "Real-time speech transcription CLI for macOS Apple Silicon with hotkey activation"
   homepage "https://github.com/alexandrelam/openscribe"
   version "0.1.0"
   license "MIT"
 
-  if Hardware::CPU.arm?
-    url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-arm64.tar.gz"
-    sha256 "REPLACE_WITH_ARM64_SHA256"
-  else
-    url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-amd64.tar.gz"
-    sha256 "REPLACE_WITH_AMD64_SHA256"
-  end
+  url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-arm64.tar.gz"
+  sha256 "REPLACE_WITH_ARM64_SHA256"
 
   depends_on "whisper-cpp"
   depends_on :macos
+  depends_on arch: :arm64
 
   def install
-    if Hardware::CPU.arm?
-      bin.install "openscribe-darwin-arm64" => "openscribe"
-    else
-      bin.install "openscribe-darwin-amd64" => "openscribe"
-    end
+    bin.install "openscribe-darwin-arm64" => "openscribe"
   end
 
   def caveats
