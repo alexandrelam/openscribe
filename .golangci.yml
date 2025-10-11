@@ -4,11 +4,6 @@
 run:
   timeout: 5m
   tests: true
-  skip-dirs:
-    - vendor
-    - testdata
-  skip-files:
-    - ".*_test.go"
 
 linters:
   enable:
@@ -34,7 +29,10 @@ linters-settings:
     check-blank: false
 
   govet:
-    check-shadowing: false
+    enable:
+      - shadow
+    disable:
+      - shadow
 
   revive:
     rules:
@@ -50,6 +48,11 @@ linters-settings:
     local-prefixes: github.com/alexandrelam/openscribe
 
 issues:
+  exclude-dirs:
+    - vendor
+    - testdata
+  exclude-files:
+    - ".*_test.go"
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
@@ -66,6 +69,7 @@ issues:
   max-same-issues: 0
 
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
