@@ -51,6 +51,11 @@ fmt:
 	@echo "Formatting code..."
 	$(GOCMD) fmt ./...
 
+# Run linter
+lint:
+	@echo "Running linter..."
+	golangci-lint run
+
 # Display help
 help:
 	@echo "OpenScribe Makefile Commands:"
@@ -61,6 +66,7 @@ help:
 	@echo "  make test     - Run tests"
 	@echo "  make deps     - Download and tidy dependencies"
 	@echo "  make fmt      - Format code"
+	@echo "  make lint     - Run linter"
 	@echo "  make help     - Display this help message"
 
-.PHONY: build install run clean test deps fmt help
+.PHONY: build install run clean test deps fmt lint help

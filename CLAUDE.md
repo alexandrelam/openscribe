@@ -10,5 +10,6 @@ help:
 	@echo "  make test     - Run tests"
 	@echo "  make deps     - Download and tidy dependencies"
 	@echo "  make fmt      - Format code"
+	@echo "  make lint     - Run linter"
 	@echo "  make help     - Display this help message"
 ```
