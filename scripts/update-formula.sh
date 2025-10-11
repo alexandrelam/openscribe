@@ -19,21 +19,17 @@ VERSION=${VERSION#v}
 
 echo "Updating Homebrew formula for version $VERSION..."
 
-# Download SHA256 checksums from GitHub release
+# Download SHA256 checksum from GitHub release (ARM64 only - Apple Silicon)
 echo "Fetching ARM64 SHA256..."
 ARM64_SHA=$(curl -sL "https://github.com/alexandrelam/openscribe/releases/download/v${VERSION}/openscribe-darwin-arm64.tar.gz.sha256" | awk '{print $1}')
 
-echo "Fetching AMD64 SHA256..."
-AMD64_SHA=$(curl -sL "https://github.com/alexandrelam/openscribe/releases/download/v${VERSION}/openscribe-darwin-amd64.tar.gz.sha256" | awk '{print $1}')
-
-if [ -z "$ARM64_SHA" ] || [ -z "$AMD64_SHA" ]; then
-    echo "Error: Could not fetch SHA256 checksums from release"
-    echo "Make sure the release v${VERSION} exists and has the checksum files"
+if [ -z "$ARM64_SHA" ]; then
+    echo "Error: Could not fetch SHA256 checksum from release"
+    echo "Make sure the release v${VERSION} exists and has the checksum file"
     exit 1
 fi
 
 echo "ARM64 SHA256: $ARM64_SHA"
-echo "AMD64 SHA256: $AMD64_SHA"
 
 # Update the formula
 FORMULA_PATH="$TAP_REPO/Formula/openscribe.rb"
@@ -51,28 +47,22 @@ class Openscribe < Formula
   version "$VERSION"
   license "MIT"
 
-  if Hardware::CPU.arm?
-    url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-arm64.tar.gz"
-    sha256 "$ARM64_SHA"
-  else
-    url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-amd64.tar.gz"
-    sha256 "$AMD64_SHA"
-  end
+  url "https://github.com/alexandrelam/openscribe/releases/download/v#{version}/openscribe-darwin-arm64.tar.gz"
+  sha256 "$ARM64_SHA"
 
   depends_on "whisper-cpp"
+  depends_on arch: :arm64
   depends_on :macos
 
   def install
-    if Hardware::CPU.arm?
-      bin.install "openscribe-darwin-arm64" => "openscribe"
-    else
-      bin.install "openscribe-darwin-amd64" => "openscribe"
-    end
+    bin.install "openscribe-darwin-arm64" => "openscribe"
   end
 
   def caveats
     <<~EOS
       OpenScribe has been installed successfully!
+
+      Note: OpenScribe only supports macOS Apple Silicon (M1/M2/M3/M4).
 
       Before using OpenScribe, you need to:
 
