@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexandrelam/openscribe/internal/config"
+	"github.com/alexandrelam/openscribe/internal/logging"
 	"github.com/alexandrelam/openscribe/internal/models"
 	"github.com/alexandrelam/openscribe/internal/transcription"
 	"github.com/spf13/cobra"
@@ -105,13 +106,26 @@ func runTranscribe(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Processing time: %.2f seconds\n", duration.Seconds())
 
-	// Optionally log the transcription
-	cfg, err := config.Load()
-	if err == nil && cfg.Verbose {
-		fmt.Println()
-		if logsDir, err := config.GetLogsDir(); err == nil {
-			fmt.Printf("You can view this in logs at: %s\n", logsDir)
+	// Log the transcription
+	detectedLang := result.Language
+	if detectedLang == "" {
+		detectedLang = transcribeLanguage
+		if detectedLang == "" {
+			detectedLang = "auto"
 		}
+	}
+
+	// Get audio file duration (approximate - we'll use processing time for now)
+	// In a real scenario, we'd parse the WAV file to get actual duration
+	audioDuration := duration.Seconds()
+
+	if err := logging.LogTranscription(audioDuration, string(modelSize), detectedLang, result.Text); err != nil {
+		fmt.Fprintf(os.Stderr, "\nWarning: Failed to log transcription: %v\n", err)
+	} else {
+		fmt.Println()
+		logPath, _ := config.GetTranscriptionLogPath()
+		fmt.Printf("✓ Transcription logged to: %s\n", logPath)
+		fmt.Printf("  View logs with: openscribe logs show\n")
 	}
 
 	return nil
