@@ -362,7 +362,7 @@ func runStart(cmd *cobra.Command) {
 
 				// Auto-paste if enabled
 				if cfg.AutoPaste && kb != nil {
-					if err := kb.TypeText(transcriptionText); err != nil {
+					if err := kb.PasteText(transcriptionText); err != nil {
 						fmt.Fprintf(os.Stderr, "Warning: Failed to paste text: %v\n", err)
 					} else {
 						fmt.Println("✅ Text pasted to cursor position!")
@@ -509,7 +509,7 @@ func runStart(cmd *cobra.Command) {
 
 			// Auto-paste if enabled
 			if cfg.AutoPaste && kb != nil {
-				if err := kb.TypeText(transcription); err != nil {
+				if err := kb.PasteText(transcription); err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: Failed to paste text: %v\n", err)
 				} else {
 					fmt.Println("✅ Text pasted to cursor position!")

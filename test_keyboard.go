@@ -11,8 +11,8 @@ import (
 )
 
 func main() {
-	fmt.Println("Keyboard Simulation Test")
-	fmt.Println("=========================")
+	fmt.Println("Keyboard Paste Test")
+	fmt.Println("===================")
 	fmt.Println()
 
 	// Create keyboard instance
@@ -35,7 +35,7 @@ func main() {
 
 	fmt.Println("✓ Accessibility permissions granted")
 	fmt.Println()
-	fmt.Println("Test will type text in 5 seconds...")
+	fmt.Println("Test will paste text in 5 seconds...")
 	fmt.Println("Please click in a text editor (TextEdit, Notes, etc.) now!")
 	fmt.Println()
 
@@ -45,13 +45,13 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
-	testText := "Hello from OpenScribe! This is a test of keyboard simulation."
-	fmt.Printf("Typing: \"%s\"\n", testText)
+	testText := "Hello from OpenScribe! This is a test of clipboard paste."
+	fmt.Printf("Pasting: \"%s\"\n", testText)
 
-	if err := kb.TypeText(testText); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to type text: %v\n", err)
+	if err := kb.PasteText(testText); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to paste text: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("✓ Text typed successfully!")
+	fmt.Println("✓ Text pasted successfully!")
 }

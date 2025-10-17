@@ -3,8 +3,8 @@ package keyboard
 
 // Keyboard provides an interface for simulating keyboard input
 type Keyboard interface {
-	// TypeText simulates typing the given text at the current cursor position
-	TypeText(text string) error
+	// PasteText pastes the given text at the current cursor position using clipboard
+	PasteText(text string) error
 
 	// CheckPermissions verifies that the necessary permissions are granted
 	CheckPermissions() error

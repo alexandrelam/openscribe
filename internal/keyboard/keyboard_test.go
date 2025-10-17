@@ -54,7 +54,7 @@ func TestCheckPermissions(t *testing.T) {
 	t.Logf("CheckPermissions() returned: %v", err)
 }
 
-func TestTypeText_EmptyString(t *testing.T) {
+func TestPasteText_EmptyString(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("Skipping macOS-specific test on non-darwin platform")
 	}
@@ -71,13 +71,13 @@ func TestTypeText_EmptyString(t *testing.T) {
 
 	// Test with empty string (should not crash)
 	// Note: This will fail if permissions aren't granted, which is expected
-	err = kb.TypeText("")
-	if err != nil && err.Error() != "cannot type text: accessibility permissions not granted" {
-		t.Errorf("TypeText(\"\") failed unexpectedly: %v", err)
+	err = kb.PasteText("")
+	if err != nil && err.Error() != "cannot paste text: accessibility permissions not granted" {
+		t.Errorf("PasteText(\"\") failed unexpectedly: %v", err)
 	}
 }
 
-func TestTypeText_Unicode(t *testing.T) {
+func TestPasteText_Unicode(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("Skipping macOS-specific test on non-darwin platform")
 	}
@@ -103,9 +103,9 @@ func TestTypeText_Unicode(t *testing.T) {
 
 	for _, str := range testStrings {
 		// Note: This will fail if permissions aren't granted, which is expected
-		err := kb.TypeText(str)
-		if err != nil && err.Error() != "cannot type text: accessibility permissions not granted" {
-			t.Errorf("TypeText(%q) failed unexpectedly: %v", str, err)
+		err := kb.PasteText(str)
+		if err != nil && err.Error() != "cannot paste text: accessibility permissions not granted" {
+			t.Errorf("PasteText(%q) failed unexpectedly: %v", str, err)
 		}
 	}
 }
@@ -147,7 +147,7 @@ func TestRequestPermissions(t *testing.T) {
 }
 
 // Benchmark tests
-func BenchmarkTypeText(b *testing.B) {
+func BenchmarkPasteText(b *testing.B) {
 	if runtime.GOOS != "darwin" {
 		b.Skip("Skipping macOS-specific benchmark on non-darwin platform")
 	}
@@ -171,7 +171,7 @@ func BenchmarkTypeText(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = kb.TypeText(testText)
+		_ = kb.PasteText(testText)
 	}
 }
 
