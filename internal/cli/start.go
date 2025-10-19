@@ -46,7 +46,10 @@ func runStart(cmd *cobra.Command) {
 
 	// Apply command-line overrides
 	if cmd.Flags().Changed("microphone") {
-		cfg.Microphone, _ = cmd.Flags().GetString("microphone")
+		micOverride, _ := cmd.Flags().GetString("microphone")
+		// When --microphone flag is used, it takes priority over preferences
+		// Prepend it to the preferences list
+		cfg.PreferredMicrophones = append([]string{micOverride}, cfg.PreferredMicrophones...)
 	}
 	if cmd.Flags().Changed("model") {
 		cfg.Model, _ = cmd.Flags().GetString("model")
@@ -60,6 +63,13 @@ func runStart(cmd *cobra.Command) {
 	}
 	if cmd.Flags().Changed("verbose") {
 		cfg.Verbose, _ = cmd.Flags().GetBool("verbose")
+	}
+
+	// Select the best available microphone based on preferences
+	selectedDevice, err := audio.SelectMicrophone(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error selecting microphone: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Parse model size
@@ -114,10 +124,6 @@ func runStart(cmd *cobra.Command) {
 	}
 
 	// Display current configuration
-	microphone := cfg.Microphone
-	if microphone == "" {
-		microphone = "(system default)"
-	}
 	language := cfg.Language
 	if language == "" {
 		language = "auto-detect"
@@ -125,7 +131,7 @@ func runStart(cmd *cobra.Command) {
 
 	fmt.Printf("OpenScribe v%s Starting...\n", Version)
 	fmt.Printf("  Build:           %s (%s)\n", GitCommit, BuildDate)
-	fmt.Printf("  Microphone:      %s\n", microphone)
+	fmt.Printf("  Microphone:      %s\n", selectedDevice.Name)
 	fmt.Printf("  Model:           %s\n", cfg.Model)
 	fmt.Printf("  Language:        %s\n", language)
 	fmt.Printf("  Hotkey:          %s (double-press)\n", cfg.Hotkey)
@@ -224,7 +230,7 @@ func runStart(cmd *cobra.Command) {
 			}
 
 			// Create and start recorder
-			recorder = audio.NewRecorder(cfg.Microphone)
+			recorder = audio.NewRecorder(selectedDevice.Name)
 			if err := recorder.Start(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error starting recording: %v\n", err)
 				isRecording = false

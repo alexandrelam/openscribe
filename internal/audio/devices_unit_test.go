@@ -3,6 +3,8 @@ package audio
 import (
 	"fmt"
 	"testing"
+
+	"github.com/alexandrelam/openscribe/internal/config"
 )
 
 // Helper to create mock devices for testing
@@ -249,4 +251,240 @@ func TestFindMicrophoneByNameOrIndexInList_EdgeCases(t *testing.T) {
 			t.Error("Expected error when using whitespace, got nil")
 		}
 	})
+}
+
+// Tests for SelectMicrophone functionality
+
+func TestSelectMicrophoneFromList_WithPreferredMicrophones(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "Blue Yeti USB Microphone", IsDefault: false},
+		{ID: "2", Name: "AirPods Pro", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{"Blue Yeti USB Microphone", "AirPods Pro"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should select first available preferred microphone
+	if device.Name != "Blue Yeti USB Microphone" {
+		t.Errorf("Expected 'Blue Yeti USB Microphone', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_FallbackToSecondPreference(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "AirPods Pro", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{"Blue Yeti USB Microphone", "AirPods Pro", "MacBook Pro Microphone"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// First preference not available, should select second
+	if device.Name != "AirPods Pro" {
+		t.Errorf("Expected 'AirPods Pro', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_CaseInsensitiveMatching(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "Blue Yeti USB Microphone", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{"blue yeti usb microphone"}, // Lowercase
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should match despite different case
+	if device.Name != "Blue Yeti USB Microphone" {
+		t.Errorf("Expected 'Blue Yeti USB Microphone', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_NoPreferencesAvailable_UsesDefault(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "AirPods Pro", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{"Blue Yeti USB Microphone", "External Mic"}, // None available
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should fallback to default microphone
+	if device.Name != "MacBook Pro Microphone" {
+		t.Errorf("Expected 'MacBook Pro Microphone', got '%s'", device.Name)
+	}
+	if !device.IsDefault {
+		t.Error("Expected device to be default")
+	}
+}
+
+func TestSelectMicrophoneFromList_EmptyPreferences_UsesDefault(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "Blue Yeti USB Microphone", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{}, // Empty
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should use default microphone
+	if device.Name != "MacBook Pro Microphone" {
+		t.Errorf("Expected 'MacBook Pro Microphone', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_LegacyMicrophoneField(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "Blue Yeti USB Microphone", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		Microphone:           "Blue Yeti USB Microphone", // Legacy field
+		PreferredMicrophones: []string{},                 // Empty preferences
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should use legacy Microphone field
+	if device.Name != "Blue Yeti USB Microphone" {
+		t.Errorf("Expected 'Blue Yeti USB Microphone', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_LegacyMicrophoneNotAvailable(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "AirPods Pro", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		Microphone:           "Blue Yeti USB Microphone", // Not available
+		PreferredMicrophones: []string{},                 // Empty preferences
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should fallback to default
+	if device.Name != "MacBook Pro Microphone" {
+		t.Errorf("Expected 'MacBook Pro Microphone', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_PreferencesTakePrecedenceOverLegacy(t *testing.T) {
+	devices := []Device{
+		{ID: "0", Name: "MacBook Pro Microphone", IsDefault: true},
+		{ID: "1", Name: "Blue Yeti USB Microphone", IsDefault: false},
+		{ID: "2", Name: "AirPods Pro", IsDefault: false},
+	}
+
+	cfg := &config.Config{
+		Microphone:           "Blue Yeti USB Microphone", // Legacy
+		PreferredMicrophones: []string{"AirPods Pro"},    // New preference
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	device, err := selectMicrophoneFromList(devices, cfg)
+	if err != nil {
+		t.Fatalf("SelectMicrophone failed: %v", err)
+	}
+
+	// Should prefer PreferredMicrophones over legacy Microphone field
+	if device.Name != "AirPods Pro" {
+		t.Errorf("Expected 'AirPods Pro', got '%s'", device.Name)
+	}
+}
+
+func TestSelectMicrophoneFromList_NoDevices(t *testing.T) {
+	devices := []Device{} // Empty list
+
+	cfg := &config.Config{
+		PreferredMicrophones: []string{"Blue Yeti USB Microphone"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	_, err := selectMicrophoneFromList(devices, cfg)
+	if err == nil {
+		t.Error("Expected error when no devices available, got nil")
+	}
 }

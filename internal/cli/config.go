@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
@@ -28,7 +29,11 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-language") &&
 			!cmd.Flags().Changed("set-hotkey") &&
 			!cmd.Flags().Changed("enable-audio-feedback") &&
-			!cmd.Flags().Changed("disable-audio-feedback") {
+			!cmd.Flags().Changed("disable-audio-feedback") &&
+			!cmd.Flags().Changed("show-preferences") &&
+			!cmd.Flags().Changed("add-preference") &&
+			!cmd.Flags().Changed("remove-preference") &&
+			!cmd.Flags().Changed("clear-preferences") {
 			_ = cmd.Help()
 			return
 		}
@@ -104,6 +109,29 @@ var configCmd = &cobra.Command{
 			handleSetConfig("hotkey", value)
 			return
 		}
+
+		// Handle preference management commands
+		if cmd.Flags().Changed("show-preferences") {
+			handleShowPreferences()
+			return
+		}
+
+		if cmd.Flags().Changed("add-preference") {
+			value, _ := cmd.Flags().GetString("add-preference")
+			handleAddPreference(value)
+			return
+		}
+
+		if cmd.Flags().Changed("remove-preference") {
+			value, _ := cmd.Flags().GetString("remove-preference")
+			handleRemovePreference(value)
+			return
+		}
+
+		if cmd.Flags().Changed("clear-preferences") {
+			handleClearPreferences()
+			return
+		}
 	},
 }
 
@@ -167,8 +195,10 @@ func handleListMicrophones() {
 		fmt.Printf("  %d. %s%s\n", i+1, device.Name, defaultMarker)
 	}
 
-	fmt.Println("\nTo set a microphone, use either the number or name:")
-	fmt.Println("  openscribe config --set-microphone 1")
+	fmt.Println("\nTo set preferences:")
+	fmt.Println("  openscribe config --add-preference \"<microphone name>\"")
+	fmt.Println("  openscribe config --show-preferences")
+	fmt.Println("\nTo set a single microphone (legacy):")
 	fmt.Println("  openscribe config --set-microphone \"<microphone name>\"")
 }
 
@@ -327,6 +357,171 @@ func handleSetAudioFeedback(enabled bool) {
 	fmt.Println("Configuration saved successfully!")
 }
 
+func handleShowPreferences() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(cfg.PreferredMicrophones) == 0 {
+		fmt.Println("No preferred microphones configured.")
+		fmt.Println("\nUsing: System default microphone")
+		fmt.Println("\nTo add preferences:")
+		fmt.Println("  openscribe config --add-preference \"<microphone name>\"")
+		return
+	}
+
+	fmt.Println("Preferred Microphones (in priority order):")
+	for i, mic := range cfg.PreferredMicrophones {
+		fmt.Printf("  %d. %s\n", i+1, mic)
+	}
+	fmt.Println("\nFallback: System default microphone")
+}
+
+func handleAddPreference(name string) {
+	// Validate input
+	if name == "" {
+		fmt.Fprintf(os.Stderr, "Error: Microphone name cannot be empty\n")
+		fmt.Println("\nUsage:")
+		fmt.Println("  openscribe config --add-preference \"<microphone name>\"")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Check for duplicates (case-insensitive)
+	for i, existingMic := range cfg.PreferredMicrophones {
+		if existingMic == name {
+			fmt.Fprintf(os.Stderr, "Error: \"%s\" is already in your preferences (priority %d)\n", name, i+1)
+			os.Exit(1)
+		}
+	}
+
+	// Check if device is currently connected (warning, not error)
+	devices, err := audio.ListMicrophones()
+	if err == nil {
+		found := false
+		for _, device := range devices {
+			if device.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fmt.Printf("⚠ Warning: \"%s\" is not currently connected\n", name)
+		}
+	}
+
+	// Add to preferences
+	cfg.PreferredMicrophones = append(cfg.PreferredMicrophones, name)
+
+	// Validate before saving
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Save the updated config
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Added \"%s\" to preferred microphones (priority %d)\n", name, len(cfg.PreferredMicrophones))
+	fmt.Println("Configuration saved successfully!")
+}
+
+func handleRemovePreference(nameOrIndex string) {
+	if nameOrIndex == "" {
+		fmt.Fprintf(os.Stderr, "Error: Must provide microphone name or index\n")
+		fmt.Println("\nUsage:")
+		fmt.Println("  openscribe config --remove-preference \"<microphone name>\"")
+		fmt.Println("  openscribe config --remove-preference <index>")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(cfg.PreferredMicrophones) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: No preferred microphones configured\n")
+		os.Exit(1)
+	}
+
+	// Try to find and remove the preference
+	removedName := ""
+	newPreferences := []string{}
+
+	// Try parsing as index first
+	if idx, parseErr := strconv.Atoi(nameOrIndex); parseErr == nil {
+		// It's a number - validate index range
+		if idx < 1 || idx > len(cfg.PreferredMicrophones) {
+			fmt.Fprintf(os.Stderr, "Error: Invalid index: %d (valid range: 1-%d)\n", idx, len(cfg.PreferredMicrophones))
+			os.Exit(1)
+		}
+		// Remove by index (convert from 1-based to 0-based)
+		removedName = cfg.PreferredMicrophones[idx-1]
+		for i, mic := range cfg.PreferredMicrophones {
+			if i != idx-1 {
+				newPreferences = append(newPreferences, mic)
+			}
+		}
+	} else {
+		// It's a name - find and remove (case-sensitive match)
+		found := false
+		for _, mic := range cfg.PreferredMicrophones {
+			if mic == nameOrIndex {
+				removedName = mic
+				found = true
+			} else {
+				newPreferences = append(newPreferences, mic)
+			}
+		}
+		if !found {
+			fmt.Fprintf(os.Stderr, "Error: \"%s\" not found in preferences\n", nameOrIndex)
+			os.Exit(1)
+		}
+	}
+
+	cfg.PreferredMicrophones = newPreferences
+
+	// Save the updated config
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Removed \"%s\" from preferred microphones\n", removedName)
+	fmt.Println("Configuration saved successfully!")
+}
+
+func handleClearPreferences() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.PreferredMicrophones = []string{}
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("✓ Cleared all preferred microphones")
+	fmt.Println("  Will now use system default microphone")
+	fmt.Println("Configuration saved successfully!")
+}
+
 func init() {
 	rootCmd.AddCommand(configCmd)
 
@@ -343,4 +538,10 @@ func init() {
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")
 	configCmd.Flags().String("set-hotkey", "", "Configure activation hotkey")
+
+	// Add flags for preference management
+	configCmd.Flags().Bool("show-preferences", false, "Show current preferred microphones list")
+	configCmd.Flags().String("add-preference", "", "Add a microphone to the preferences list")
+	configCmd.Flags().String("remove-preference", "", "Remove a microphone from preferences (by name or index)")
+	configCmd.Flags().Bool("clear-preferences", false, "Clear all preferred microphones")
 }

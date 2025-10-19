@@ -40,3 +40,12 @@ __debug_bin
 
 # Air live reload tool
 tmp/
+
+# Environment and config files
+.env
+.env.*
+*.log
+
+# Test fixtures (if containing sensitive data)
+tests/fixtures/*.yaml
+!tests/fixtures/test_config.yaml

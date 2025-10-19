@@ -256,8 +256,47 @@ This will open `~/Library/Application Support/openscribe/config.yaml` in your de
 # List available microphones
 openscribe config --list-microphones
 
-# Set default microphone
+# Set default microphone (legacy - single device)
 openscribe config --set-microphone "MacBook Pro Microphone"
+
+# Manage preferred microphones (recommended - fallback priority list)
+openscribe config --show-preferences              # View current preferences
+openscribe config --add-preference "Blue Yeti"    # Add to preference list
+openscribe config --add-preference "AirPods Pro"  # Add another (lower priority)
+openscribe config --remove-preference "Blue Yeti" # Remove by name
+openscribe config --remove-preference 2           # Remove by priority index
+openscribe config --clear-preferences             # Clear all preferences
+```
+
+**Preferred Microphones Feature:**
+OpenScribe can automatically select from a prioritized list of microphones. If you frequently switch between devices (e.g., external USB mic, AirPods, built-in mic), this feature automatically selects the first available device from your preference list.
+
+Example workflow:
+```bash
+# Set up your preference order
+$ openscribe config --add-preference "Blue Yeti USB Microphone"
+✓ Added "Blue Yeti USB Microphone" to preferred microphones (priority 1)
+
+$ openscribe config --add-preference "AirPods Pro"
+✓ Added "AirPods Pro" to preferred microphones (priority 2)
+
+$ openscribe config --add-preference "MacBook Pro Microphone"
+✓ Added "MacBook Pro Microphone" to preferred microphones (priority 3)
+
+# View your preferences
+$ openscribe config --show-preferences
+Preferred Microphones (in priority order):
+  1. Blue Yeti USB Microphone
+  2. AirPods Pro
+  3. MacBook Pro Microphone
+
+Fallback: System default microphone
+
+# OpenScribe will now automatically select:
+# - Blue Yeti if connected
+# - Otherwise AirPods Pro if connected
+# - Otherwise MacBook Pro Microphone
+# - Otherwise system default
 ```
 
 ### Configure Model
@@ -320,7 +359,11 @@ All settings are stored in:
 You can edit this file directly using `openscribe config --open` or with any text editor. Example:
 
 ```yaml
-microphone: "MacBook Pro Microphone"
+microphone: "MacBook Pro Microphone"  # Legacy - for backward compatibility
+preferred_microphones:                # Recommended - ordered priority list
+  - "Blue Yeti USB Microphone"        # Priority 1
+  - "AirPods Pro"                     # Priority 2
+  - "MacBook Pro Microphone"          # Priority 3
 model: "small"
 language: "auto"
 hotkey: "Right Option"
@@ -362,7 +405,11 @@ complete_sound: "Glass"
 | `--show` | Display current configuration |
 | `--open` | Open configuration file in default editor |
 | `--list-microphones` | List available microphones |
-| `--set-microphone` | Set default microphone |
+| `--set-microphone` | Set default microphone (legacy) |
+| `--show-preferences` | Show preferred microphones list |
+| `--add-preference <name>` | Add a microphone to preferences |
+| `--remove-preference <name\|index>` | Remove a microphone from preferences |
+| `--clear-preferences` | Clear all preferred microphones |
 | `--set-model` | Set default model |
 | `--set-language` | Set default language |
 | `--set-hotkey` | Configure activation hotkey |
