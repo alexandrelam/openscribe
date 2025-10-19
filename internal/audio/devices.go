@@ -3,8 +3,11 @@ package audio
 
 import (
 	"fmt"
+	"log"
 	"strconv"
+	"strings"
 
+	"github.com/alexandrelam/openscribe/internal/config"
 	"github.com/gen2brain/malgo"
 )
 
@@ -139,4 +142,63 @@ func findMicrophoneByNameOrIndexInList(devices []Device, nameOrIndex string) (*D
 	}
 
 	return nil, fmt.Errorf("microphone not found: %s", nameOrIndex)
+}
+
+// SelectMicrophone selects the best available microphone based on user preferences.
+// It tries preferred microphones in order, then falls back to legacy Microphone field,
+// and finally to the system default.
+func SelectMicrophone(cfg *config.Config) (*Device, error) {
+	devices, err := ListMicrophones()
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate devices: %w\n\nPlease check:\n  1. Microphone is connected\n  2. System Preferences > Sound > Input\n  3. Microphone permissions granted", err)
+	}
+
+	return selectMicrophoneFromList(devices, cfg)
+}
+
+// selectMicrophoneFromList is an internal helper for testing
+func selectMicrophoneFromList(devices []Device, cfg *config.Config) (*Device, error) {
+	// Try preferred microphones in order
+	if len(cfg.PreferredMicrophones) > 0 {
+		log.Printf("[AUDIO] Trying %d preferred microphones...", len(cfg.PreferredMicrophones))
+		for i, prefName := range cfg.PreferredMicrophones {
+			log.Printf("[AUDIO]   Checking preference #%d: %s", i+1, prefName)
+			for _, dev := range devices {
+				// Case-insensitive exact match
+				if strings.EqualFold(dev.Name, prefName) {
+					log.Printf("[AUDIO] ✓ Selected preferred microphone #%d: %s (from preferences)", i+1, dev.Name)
+					return &dev, nil
+				}
+			}
+			log.Printf("[AUDIO]   ✗ Preference #%d not available: %s", i+1, prefName)
+		}
+		log.Printf("[AUDIO] ⚠ No preferred microphones available, falling back to default")
+		return getDefaultMicrophoneFromList(devices)
+	}
+
+	// Legacy: Try single microphone field
+	if cfg.Microphone != "" {
+		log.Printf("[AUDIO] Using legacy 'microphone' config field: %s", cfg.Microphone)
+		for _, dev := range devices {
+			if strings.EqualFold(dev.Name, cfg.Microphone) {
+				log.Printf("[AUDIO] ✓ Selected legacy microphone: %s", dev.Name)
+				return &dev, nil
+			}
+		}
+		log.Printf("[AUDIO] ⚠ Legacy microphone not found, falling back to default")
+	}
+
+	// Fallback to default microphone
+	defaultDev, err := getDefaultMicrophoneFromList(devices)
+	if err != nil {
+		return nil, fmt.Errorf("no microphones available: %w", err)
+	}
+
+	if len(cfg.PreferredMicrophones) > 0 {
+		log.Printf("[AUDIO] ⚠ Using fallback (default microphone): %s", defaultDev.Name)
+	} else {
+		log.Printf("[AUDIO] ✓ Using default microphone: %s", defaultDev.Name)
+	}
+
+	return defaultDev, nil
 }

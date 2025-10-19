@@ -1,0 +1,15 @@
+# Test configuration for unit tests
+# This file contains sample configurations for testing the preferred microphones feature
+
+model: "small"
+language: ""
+hotkey: "Right Option"
+auto_paste: true
+audio_feedback: true
+verbose: false
+
+# Example with multiple preferred microphones
+preferred_microphones:
+  - "Blue Yeti USB Microphone"
+  - "AirPods Pro"
+  - "MacBook Pro Microphone"

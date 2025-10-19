@@ -398,3 +398,243 @@ func TestLoad_InvalidYAML(t *testing.T) {
 		t.Errorf("Load() error = %v, want error containing 'failed to parse config file'", err)
 	}
 }
+
+// Tests for PreferredMicrophones functionality
+
+func TestDefaultConfig_PreferredMicrophones(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// PreferredMicrophones should be empty array by default
+	if len(cfg.PreferredMicrophones) != 0 {
+		t.Errorf("DefaultConfig().PreferredMicrophones = %v, want empty array", cfg.PreferredMicrophones)
+	}
+}
+
+func TestLoad_WithPreferredMicrophones(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Create config with preferred microphones
+	original := &Config{
+		PreferredMicrophones: []string{"Blue Yeti USB Microphone", "AirPods Pro", "MacBook Pro Microphone"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	// Save it
+	err := original.Save()
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load it back
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Verify PreferredMicrophones
+	if len(loaded.PreferredMicrophones) != 3 {
+		t.Errorf("PreferredMicrophones length = %d, want 3", len(loaded.PreferredMicrophones))
+	}
+	if loaded.PreferredMicrophones[0] != "Blue Yeti USB Microphone" {
+		t.Errorf("PreferredMicrophones[0] = %s, want Blue Yeti USB Microphone", loaded.PreferredMicrophones[0])
+	}
+	if loaded.PreferredMicrophones[1] != "AirPods Pro" {
+		t.Errorf("PreferredMicrophones[1] = %s, want AirPods Pro", loaded.PreferredMicrophones[1])
+	}
+	if loaded.PreferredMicrophones[2] != "MacBook Pro Microphone" {
+		t.Errorf("PreferredMicrophones[2] = %s, want MacBook Pro Microphone", loaded.PreferredMicrophones[2])
+	}
+}
+
+func TestValidate_PreferredMicrophones_EmptyString(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.PreferredMicrophones = []string{"Blue Yeti", "", "AirPods"}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with empty string in PreferredMicrophones should return error")
+	}
+	if !strings.Contains(err.Error(), "preferred_microphones[1] cannot be empty") {
+		t.Errorf("Validate() error = %v, want error containing 'preferred_microphones[1] cannot be empty'", err)
+	}
+}
+
+func TestValidate_PreferredMicrophones_Duplicates(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.PreferredMicrophones = []string{"Blue Yeti", "AirPods", "blue yeti"}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with duplicate microphones should return error")
+	}
+	if !strings.Contains(err.Error(), "duplicate preferred microphone") {
+		t.Errorf("Validate() error = %v, want error containing 'duplicate preferred microphone'", err)
+	}
+}
+
+func TestValidate_PreferredMicrophones_ValidList(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.PreferredMicrophones = []string{"Blue Yeti", "AirPods Pro", "MacBook Pro Microphone"}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() with valid PreferredMicrophones error = %v, want nil", err)
+	}
+}
+
+func TestValidate_PreferredMicrophones_Empty(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.PreferredMicrophones = []string{}
+
+	// Empty array should be valid (means use default)
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() with empty PreferredMicrophones error = %v, want nil", err)
+	}
+}
+
+func TestMigrate_LegacyMicrophoneToPreferredMicrophones(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Create config with legacy Microphone field only
+	yamlContent := `microphone: "Blue Yeti USB Microphone"
+model: "small"
+language: ""
+hotkey: "Right Option"
+auto_paste: true
+audio_feedback: true
+verbose: false
+`
+	configPath, _ := GetConfigPath()
+	err := EnsureDirectories()
+	if err != nil {
+		t.Fatalf("EnsureDirectories() error = %v", err)
+	}
+	err = os.WriteFile(configPath, []byte(yamlContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	// Load config (should trigger migration)
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Verify migration happened
+	if len(loaded.PreferredMicrophones) != 1 {
+		t.Errorf("PreferredMicrophones length = %d, want 1", len(loaded.PreferredMicrophones))
+	}
+	if loaded.PreferredMicrophones[0] != "Blue Yeti USB Microphone" {
+		t.Errorf("PreferredMicrophones[0] = %s, want Blue Yeti USB Microphone", loaded.PreferredMicrophones[0])
+	}
+}
+
+func TestMigrate_NoMigrationWhenBothFieldsSet(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Create config with both fields set
+	original := &Config{
+		Microphone:           "Old Mic",
+		PreferredMicrophones: []string{"New Mic 1", "New Mic 2"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	err := original.Save()
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load config
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Verify PreferredMicrophones was NOT overwritten
+	if len(loaded.PreferredMicrophones) != 2 {
+		t.Errorf("PreferredMicrophones length = %d, want 2", len(loaded.PreferredMicrophones))
+	}
+	if loaded.PreferredMicrophones[0] != "New Mic 1" {
+		t.Errorf("PreferredMicrophones[0] = %s, want New Mic 1", loaded.PreferredMicrophones[0])
+	}
+}
+
+func TestMigrate_NoMigrationWhenOnlyPreferredMicrophonesSet(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Create config with only PreferredMicrophones
+	original := &Config{
+		PreferredMicrophones: []string{"Mic 1", "Mic 2"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	err := original.Save()
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load config
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Verify PreferredMicrophones unchanged
+	if len(loaded.PreferredMicrophones) != 2 {
+		t.Errorf("PreferredMicrophones length = %d, want 2", len(loaded.PreferredMicrophones))
+	}
+}
+
+func TestString_WithPreferredMicrophones(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	cfg := &Config{
+		PreferredMicrophones: []string{"Blue Yeti", "AirPods Pro"},
+		Model:                "small",
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
+	}
+
+	output := cfg.String()
+
+	// Should contain numbered list of preferred microphones
+	if !strings.Contains(output, "1. Blue Yeti") {
+		t.Error("String() should contain '1. Blue Yeti'")
+	}
+	if !strings.Contains(output, "2. AirPods Pro") {
+		t.Error("String() should contain '2. AirPods Pro'")
+	}
+}
+
+func TestString_WithEmptyPreferredMicrophones(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	cfg := DefaultConfig()
+	output := cfg.String()
+
+	// Should indicate no preferences configured
+	if !strings.Contains(output, "(none - using system default)") {
+		t.Error("String() should indicate no preferences when PreferredMicrophones is empty")
+	}
+}

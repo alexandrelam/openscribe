@@ -3,15 +3,23 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config represents the application configuration
 type Config struct {
-	// Microphone is the selected audio input device
-	Microphone string `yaml:"microphone"`
+	// Microphone is the selected audio input device (LEGACY - for backward compatibility)
+	// Deprecated: Use PreferredMicrophones instead
+	Microphone string `yaml:"microphone,omitempty"`
+
+	// PreferredMicrophones is an ordered list of preferred microphone device names
+	// The first available device in the list will be selected
+	// If empty, falls back to Microphone field or system default
+	PreferredMicrophones []string `yaml:"preferred_microphones,omitempty"`
 
 	// Model is the Whisper model to use (tiny, base, small, medium, large)
 	Model string `yaml:"model"`
@@ -35,13 +43,14 @@ type Config struct {
 // DefaultConfig returns a Config with default values
 func DefaultConfig() *Config {
 	return &Config{
-		Microphone:    "", // Empty means use system default
-		Model:         "small",
-		Language:      "", // Empty means auto-detect
-		Hotkey:        "Right Option",
-		AutoPaste:     true,
-		AudioFeedback: true,
-		Verbose:       false,
+		Microphone:           "",         // Empty means use system default (legacy)
+		PreferredMicrophones: []string{}, // Empty means use system default
+		Model:                "small",
+		Language:             "", // Empty means auto-detect
+		Hotkey:               "Right Option",
+		AutoPaste:            true,
+		AudioFeedback:        true,
+		Verbose:              false,
 	}
 }
 
@@ -78,12 +87,30 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Run migration to handle legacy config
+	cfg.migrate()
+
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration in %s: %w\n\nYou can reset to defaults by running:\n  rm %s\n  openscribe config --show", configPath, err, configPath)
 	}
 
 	return cfg, nil
+}
+
+// migrate handles backward compatibility by auto-migrating legacy Microphone field
+// to PreferredMicrophones array. This ensures seamless upgrade for existing users.
+func (c *Config) migrate() {
+	// Auto-migrate: If new field is empty but old field is set, populate new field
+	if len(c.PreferredMicrophones) == 0 && c.Microphone != "" {
+		c.PreferredMicrophones = []string{c.Microphone}
+		log.Printf("[CONFIG] Migrated legacy 'microphone' field to 'preferred_microphones': %s", c.Microphone)
+
+		// Optionally save migrated config immediately
+		if err := c.Save(); err != nil {
+			log.Printf("[CONFIG] Warning: Failed to save migrated config: %v", err)
+		}
+	}
 }
 
 // Save writes the configuration to disk
@@ -114,6 +141,20 @@ func (c *Config) Save() error {
 
 // Validate checks if the configuration values are valid
 func (c *Config) Validate() error {
+	// Validate preferred microphones
+	seen := make(map[string]bool)
+	for i, mic := range c.PreferredMicrophones {
+		trimmed := strings.TrimSpace(mic)
+		if trimmed == "" {
+			return fmt.Errorf("preferred_microphones[%d] cannot be empty", i)
+		}
+		lowerMic := strings.ToLower(trimmed)
+		if seen[lowerMic] {
+			return fmt.Errorf("duplicate preferred microphone: %s", trimmed)
+		}
+		seen[lowerMic] = true
+	}
+
 	// Validate model
 	validModels := map[string]bool{
 		"tiny":   true,
@@ -164,6 +205,17 @@ func (c *Config) String() string {
 		microphone = "(system default)"
 	}
 
+	// Format preferred microphones list
+	var preferredMics string
+	if len(c.PreferredMicrophones) == 0 {
+		preferredMics = "(none - using system default)"
+	} else {
+		preferredMics = "\n"
+		for i, mic := range c.PreferredMicrophones {
+			preferredMics += fmt.Sprintf("    %d. %s\n", i+1, mic)
+		}
+	}
+
 	language := c.Language
 	if language == "" {
 		language = "auto-detect"
@@ -172,7 +224,8 @@ func (c *Config) String() string {
 	return fmt.Sprintf(`Current Configuration:
 
 Settings:
-  Microphone:      %s
+  Microphone:      %s (legacy)
+  Preferred Mics:  %s
   Model:           %s
   Language:        %s
   Hotkey:          %s
@@ -187,6 +240,7 @@ Paths:
   Logs:            %s
 `,
 		microphone,
+		preferredMics,
 		c.Model,
 		language,
 		c.Hotkey,
