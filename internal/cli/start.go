@@ -29,8 +29,9 @@ const (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the OpenScribe service",
-	Long: `Start OpenScribe and begin listening for hotkey activation.
-Once started, press the configured hotkey (default: Right Option) twice to start/stop recording.`,
+	Long: `Start OpenScribe and begin listening for trigger activation.
+Once started, double-press any configured trigger (default: Right Option) to start/stop recording.
+Triggers can be keyboard keys (e.g., Right Option) or mouse buttons (e.g., Forward Button).`,
 	Run: func(cmd *cobra.Command, _ []string) {
 		runStart(cmd)
 	},
@@ -129,12 +130,23 @@ func runStart(cmd *cobra.Command) {
 		language = "auto-detect"
 	}
 
+	// Format triggers for display
+	var triggersDisplay string
+	if len(cfg.Triggers) == 1 {
+		triggersDisplay = cfg.Triggers[0]
+	} else {
+		triggersDisplay = fmt.Sprintf("[%s]", cfg.Triggers[0])
+		for _, trigger := range cfg.Triggers[1:] {
+			triggersDisplay += fmt.Sprintf(" or [%s]", trigger)
+		}
+	}
+
 	fmt.Printf("OpenScribe v%s Starting...\n", Version)
 	fmt.Printf("  Build:           %s (%s)\n", GitCommit, BuildDate)
 	fmt.Printf("  Microphone:      %s\n", selectedDevice.Name)
 	fmt.Printf("  Model:           %s\n", cfg.Model)
 	fmt.Printf("  Language:        %s\n", language)
-	fmt.Printf("  Hotkey:          %s (double-press)\n", cfg.Hotkey)
+	fmt.Printf("  Triggers:        %s (double-press)\n", triggersDisplay)
 	fmt.Printf("  Auto-paste:      %t\n", cfg.AutoPaste)
 	fmt.Printf("  Audio Feedback:  %t\n", cfg.AudioFeedback)
 	fmt.Println()
@@ -542,22 +554,22 @@ func runStart(cmd *cobra.Command) {
 		}
 	}
 
-	// Create and start hotkey listener
-	listener, err := hotkey.NewListener(cfg.Hotkey, hotkeyCallback)
+	// Create and start multi-trigger listener
+	listener, err := hotkey.NewMultiListener(cfg.Triggers, hotkeyCallback)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating hotkey listener: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error creating trigger listener: %v\n", err)
 		os.Exit(1)
 	}
 
 	if err := listener.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting hotkey listener: %v\n", err)
-		fmt.Fprintf(os.Stderr, "\nNote: Hotkey detection requires accessibility permissions.\n")
+		fmt.Fprintf(os.Stderr, "Error starting trigger listener: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nNote: Trigger detection requires accessibility permissions.\n")
 		fmt.Fprintf(os.Stderr, "Please grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility\n")
 		os.Exit(1)
 	}
 	defer listener.Stop()
 
-	fmt.Println("Ready! Press hotkey to start recording...")
+	fmt.Println("Ready! Double-press any configured trigger to start recording...")
 	fmt.Println("Press Ctrl+C to exit.")
 	fmt.Println()
 

@@ -167,11 +167,13 @@ OpenScribe requires two macOS permissions:
    ```
 
 2. **Record and transcribe:**
-   - Double-press **Right Option** key to start recording (you'll hear a beep)
+   - Double-press your **trigger** (default: **Right Option** key) to start recording (you'll hear a beep)
    - Speak your message
-   - Double-press **Right Option** again to stop recording (you'll hear a different beep)
+   - Double-press your **trigger** again to stop recording (you'll hear a different beep)
    - Wait for transcription (you'll hear a completion sound)
    - Your text will automatically appear at your cursor!
+
+   You can also use mouse buttons like **Forward Button** or **Back Button** as triggers!
 
 3. **Stop OpenScribe:**
    - Press `Ctrl+C` in the terminal
@@ -216,9 +218,9 @@ OpenScribe v1.0.0 Starting...
   Microphone:      MacBook Pro Microphone
   Model:           small
   Language:        auto-detect
-  Hotkey:          Right Option (double-press)
+  Triggers:        Right Option (double-press)
   Audio feedback:  enabled
-Ready! Press hotkey to start recording...
+Ready! Double-press any configured trigger to start recording...
 
 [Double-press Right Option]
 🔴 Recording... (press hotkey again to stop)
@@ -321,17 +323,30 @@ openscribe config --set-language en  # English
 openscribe config --set-language auto  # Auto-detect
 ```
 
-### Configure Hotkey
+### Configure Triggers
+
+OpenScribe supports multiple activation triggers - both keyboard keys and mouse buttons!
 
 ```bash
-# List available hotkeys
+# List available triggers
 openscribe config --list-hotkeys
 
-# Set activation hotkey
-openscribe config --set-hotkey "Right Option"
-openscribe config --set-hotkey "Left Shift"
-openscribe config --set-hotkey "Right Command"
+# Set activation trigger(s) by editing the config file
+# You can configure multiple triggers simultaneously
 ```
+
+**Supported Triggers:**
+- **Keyboard modifiers:** Left/Right Option, Shift, Command, Control
+- **Mouse buttons:** Forward Button, Back Button
+
+**Configure multiple triggers** by editing your config file (`openscribe config --open`):
+```yaml
+triggers:
+  - "Right Option"
+  - "Forward Button"
+```
+
+With multiple triggers configured, you can use any of them to activate recording!
 
 ### Audio Feedback
 
@@ -366,7 +381,10 @@ preferred_microphones:                # Recommended - ordered priority list
   - "MacBook Pro Microphone"          # Priority 3
 model: "small"
 language: "auto"
-hotkey: "Right Option"
+hotkey: "Right Option"                # Legacy - for backward compatibility
+triggers:                             # New - supports multiple triggers
+  - "Right Option"                    # Keyboard trigger
+  - "Forward Button"                  # Mouse button trigger
 audio_feedback: true
 start_sound: "Tink"
 stop_sound: "Pop"
@@ -467,10 +485,11 @@ brew install whisper-cpp
 - Add `openscribe` or your terminal application to the list
 - Check the box to enable it
 
-**Hotkey not detected**
+**Trigger not detected (keyboard or mouse)**
 - Make sure OpenScribe has Accessibility permissions (see above)
-- Try a different hotkey with `openscribe config --set-hotkey "Left Shift"`
-- Check for conflicts with other apps using the same hotkey
+- Try a different trigger by editing your config file
+- Check for conflicts with other apps using the same trigger
+- For mouse buttons: ensure your mouse supports Forward/Back buttons
 
 **Poor transcription quality**
 - Try a larger model: `openscribe config --set-model medium`
@@ -492,7 +511,7 @@ For more detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 OpenScribe combines several technologies to provide seamless speech-to-text:
 
-1. **Global Hotkey Detection**: Uses macOS Carbon Event Manager APIs to detect double-press of your configured hotkey
+1. **Global Trigger Detection**: Uses macOS CGEvent APIs to detect double-press of your configured trigger(s) - supports both keyboard keys and mouse buttons
 2. **Audio Recording**: Captures audio from your selected microphone using Go audio libraries with macOS Core Audio
 3. **Speech Recognition**: Transcribes audio using [whisper.cpp](https://github.com/ggerganov/whisper.cpp), a high-performance C++ implementation of OpenAI's Whisper
 4. **Text Injection**: Simulates keyboard input using CGEvent APIs to paste text at your cursor (not clipboard-based!)

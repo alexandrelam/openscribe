@@ -17,10 +17,14 @@ func TestDefaultConfig(t *testing.T) {
 		{"Microphone", cfg.Microphone, ""},
 		{"Model", cfg.Model, "small"},
 		{"Language", cfg.Language, ""},
-		{"Hotkey", cfg.Hotkey, "Right Option"},
 		{"AutoPaste", cfg.AutoPaste, true},
 		{"AudioFeedback", cfg.AudioFeedback, true},
 		{"Verbose", cfg.Verbose, false},
+	}
+
+	// Check Triggers separately (slice comparison)
+	if len(cfg.Triggers) != 1 || cfg.Triggers[0] != "Right Option" {
+		t.Errorf("DefaultConfig().Triggers = %v, want [Right Option]", cfg.Triggers)
 	}
 
 	for _, tt := range tests {
@@ -46,8 +50,8 @@ func TestLoad_CreatesDefaultConfig(t *testing.T) {
 	if cfg.Model != "small" {
 		t.Errorf("Load() default model = %v, want small", cfg.Model)
 	}
-	if cfg.Hotkey != "Right Option" {
-		t.Errorf("Load() default hotkey = %v, want Right Option", cfg.Hotkey)
+	if len(cfg.Triggers) != 1 || cfg.Triggers[0] != "Right Option" {
+		t.Errorf("Load() default triggers = %v, want [Right Option]", cfg.Triggers)
 	}
 
 	// Verify config file was created
@@ -221,16 +225,16 @@ func TestValidate_EmptyModel(t *testing.T) {
 	}
 }
 
-func TestValidate_EmptyHotkey(t *testing.T) {
+func TestValidate_EmptyTriggers(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Hotkey = ""
+	cfg.Triggers = []string{}
 
 	err := cfg.Validate()
 	if err == nil {
-		t.Error("Validate() with empty hotkey error = nil, want error")
+		t.Error("Validate() with empty triggers error = nil, want error")
 	}
-	if !strings.Contains(err.Error(), "hotkey cannot be empty") {
-		t.Errorf("Validate() error = %v, want error containing 'hotkey cannot be empty'", err)
+	if !strings.Contains(err.Error(), "triggers cannot be empty") {
+		t.Errorf("Validate() error = %v, want error containing 'triggers cannot be empty'", err)
 	}
 }
 
@@ -418,7 +422,7 @@ func TestLoad_WithPreferredMicrophones(t *testing.T) {
 	original := &Config{
 		PreferredMicrophones: []string{"Blue Yeti USB Microphone", "AirPods Pro", "MacBook Pro Microphone"},
 		Model:                "small",
-		Hotkey:               "Right Option",
+		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
@@ -545,7 +549,7 @@ func TestMigrate_NoMigrationWhenBothFieldsSet(t *testing.T) {
 		Microphone:           "Old Mic",
 		PreferredMicrophones: []string{"New Mic 1", "New Mic 2"},
 		Model:                "small",
-		Hotkey:               "Right Option",
+		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
@@ -579,7 +583,7 @@ func TestMigrate_NoMigrationWhenOnlyPreferredMicrophonesSet(t *testing.T) {
 	original := &Config{
 		PreferredMicrophones: []string{"Mic 1", "Mic 2"},
 		Model:                "small",
-		Hotkey:               "Right Option",
+		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
@@ -609,7 +613,7 @@ func TestString_WithPreferredMicrophones(t *testing.T) {
 	cfg := &Config{
 		PreferredMicrophones: []string{"Blue Yeti", "AirPods Pro"},
 		Model:                "small",
-		Hotkey:               "Right Option",
+		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
