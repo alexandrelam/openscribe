@@ -20,6 +20,11 @@ func TestDefaultConfig(t *testing.T) {
 		{"AutoPaste", cfg.AutoPaste, true},
 		{"AudioFeedback", cfg.AudioFeedback, true},
 		{"Verbose", cfg.Verbose, false},
+		{"AutoGain", cfg.AutoGain, true},
+		{"TargetLevelDB", cfg.TargetLevelDB, -20.0},
+		{"MinThresholdDB", cfg.MinThresholdDB, -40.0},
+		{"MaxGainDB", cfg.MaxGainDB, 20.0},
+		{"ShowAudioLevels", cfg.ShowAudioLevels, false},
 	}
 
 	// Check Triggers separately (slice comparison)
@@ -640,5 +645,153 @@ func TestString_WithEmptyPreferredMicrophones(t *testing.T) {
 	// Should indicate no preferences configured
 	if !strings.Contains(output, "(none - using system default)") {
 		t.Error("String() should indicate no preferences when PreferredMicrophones is empty")
+	}
+}
+
+// Tests for Audio Gain Control functionality
+
+func TestValidate_GainControl_ValidValues(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Default values should be valid
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() with default gain control values error = %v, want nil", err)
+	}
+}
+
+func TestValidate_GainControl_PositiveTargetLevel(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TargetLevelDB = 5.0 // Invalid: positive dBFS
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with positive TargetLevelDB should return error")
+	}
+	if !strings.Contains(err.Error(), "target_level_db must be negative") {
+		t.Errorf("Validate() error = %v, want error containing 'target_level_db must be negative'", err)
+	}
+}
+
+func TestValidate_GainControl_PositiveMinThreshold(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MinThresholdDB = 10.0 // Invalid: positive dBFS
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with positive MinThresholdDB should return error")
+	}
+	if !strings.Contains(err.Error(), "min_threshold_db must be negative") {
+		t.Errorf("Validate() error = %v, want error containing 'min_threshold_db must be negative'", err)
+	}
+}
+
+func TestValidate_GainControl_TargetBelowThreshold(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TargetLevelDB = -50.0
+	cfg.MinThresholdDB = -40.0 // Target is below threshold
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with TargetLevelDB < MinThresholdDB should return error")
+	}
+	if !strings.Contains(err.Error(), "must be greater than min_threshold_db") {
+		t.Errorf("Validate() error = %v, want error containing 'must be greater than min_threshold_db'", err)
+	}
+}
+
+func TestValidate_GainControl_NegativeMaxGain(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxGainDB = -10.0 // Invalid: negative gain
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with negative MaxGainDB should return error")
+	}
+	if !strings.Contains(err.Error(), "max_gain_db must be positive") {
+		t.Errorf("Validate() error = %v, want error containing 'max_gain_db must be positive'", err)
+	}
+}
+
+func TestValidate_GainControl_ExcessiveMaxGain(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxGainDB = 50.0 // Too high
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() with MaxGainDB > 40 should return error")
+	}
+	if !strings.Contains(err.Error(), "max_gain_db is too high") {
+		t.Errorf("Validate() error = %v, want error containing 'max_gain_db is too high'", err)
+	}
+}
+
+func TestLoad_WithGainControlSettings(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Create config with custom gain control settings
+	original := &Config{
+		Model:            "small",
+		Triggers:         []string{"Right Option"},
+		AutoPaste:        true,
+		AudioFeedback:    true,
+		Verbose:          false,
+		AutoGain:         false,
+		TargetLevelDB:    -15.0,
+		MinThresholdDB:   -35.0,
+		MaxGainDB:        15.0,
+		ShowAudioLevels:  true,
+	}
+
+	// Save it
+	err := original.Save()
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load it back
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Verify gain control settings
+	if loaded.AutoGain != original.AutoGain {
+		t.Errorf("AutoGain = %v, want %v", loaded.AutoGain, original.AutoGain)
+	}
+	if loaded.TargetLevelDB != original.TargetLevelDB {
+		t.Errorf("TargetLevelDB = %v, want %v", loaded.TargetLevelDB, original.TargetLevelDB)
+	}
+	if loaded.MinThresholdDB != original.MinThresholdDB {
+		t.Errorf("MinThresholdDB = %v, want %v", loaded.MinThresholdDB, original.MinThresholdDB)
+	}
+	if loaded.MaxGainDB != original.MaxGainDB {
+		t.Errorf("MaxGainDB = %v, want %v", loaded.MaxGainDB, original.MaxGainDB)
+	}
+	if loaded.ShowAudioLevels != original.ShowAudioLevels {
+		t.Errorf("ShowAudioLevels = %v, want %v", loaded.ShowAudioLevels, original.ShowAudioLevels)
+	}
+}
+
+func TestString_WithGainControl(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	cfg := DefaultConfig()
+	output := cfg.String()
+
+	// Should contain gain control section
+	if !strings.Contains(output, "Audio Gain Control:") {
+		t.Error("String() should contain 'Audio Gain Control:' section")
+	}
+	if !strings.Contains(output, "Auto Gain:") {
+		t.Error("String() should contain 'Auto Gain:' field")
+	}
+	if !strings.Contains(output, "Target Level:") {
+		t.Error("String() should contain 'Target Level:' field")
+	}
+	if !strings.Contains(output, "-20.0 dBFS") {
+		t.Error("String() should contain default target level '-20.0 dBFS'")
 	}
 }

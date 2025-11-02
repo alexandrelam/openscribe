@@ -44,6 +44,26 @@ type Config struct {
 
 	// Verbose enables detailed debug output
 	Verbose bool `yaml:"verbose"`
+
+	// Audio gain control settings
+	// AutoGain enables automatic audio level normalization to improve transcription quality
+	AutoGain bool `yaml:"auto_gain"`
+
+	// TargetLevelDB is the target audio level in dBFS (e.g., -20.0)
+	// This is the level that quiet audio will be boosted to
+	TargetLevelDB float64 `yaml:"target_level_db"`
+
+	// MinThresholdDB is the minimum acceptable audio level in dBFS (e.g., -40.0)
+	// Audio below this level will trigger gain control (if AutoGain is enabled)
+	MinThresholdDB float64 `yaml:"min_threshold_db"`
+
+	// MaxGainDB is the maximum gain to apply in dB (e.g., 20.0)
+	// This prevents excessive amplification of very quiet audio
+	MaxGainDB float64 `yaml:"max_gain_db"`
+
+	// ShowAudioLevels displays audio level information for all recordings
+	// When false, levels are only shown in verbose mode
+	ShowAudioLevels bool `yaml:"show_audio_levels"`
 }
 
 // DefaultConfig returns a Config with default values
@@ -52,12 +72,17 @@ func DefaultConfig() *Config {
 		Microphone:           "",         // Empty means use system default (legacy)
 		PreferredMicrophones: []string{}, // Empty means use system default
 		Model:                "small",
-		Language:             "", // Empty means auto-detect
-		Hotkey:               "",         // Legacy field (deprecated)
+		Language:             "",          // Empty means auto-detect
+		Hotkey:               "",          // Legacy field (deprecated)
 		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
+		AutoGain:             true,   // Enable automatic gain control by default
+		TargetLevelDB:        -20.0,  // Good speech level (-20 dBFS)
+		MinThresholdDB:       -40.0,  // Below this is considered too quiet
+		MaxGainDB:            20.0,   // Maximum 20 dB of gain
+		ShowAudioLevels:      false,  // Only show in verbose mode by default
 	}
 }
 
@@ -234,6 +259,23 @@ func (c *Config) Validate() error {
 	// Note: We don't validate language codes as Whisper supports many languages
 	// and we don't want to restrict users to a predefined list
 
+	// Validate audio gain control settings
+	if c.TargetLevelDB > 0 {
+		return fmt.Errorf("target_level_db must be negative (dBFS scale, 0 = max level)")
+	}
+	if c.MinThresholdDB > 0 {
+		return fmt.Errorf("min_threshold_db must be negative (dBFS scale, 0 = max level)")
+	}
+	if c.TargetLevelDB < c.MinThresholdDB {
+		return fmt.Errorf("target_level_db (%.1f) must be greater than min_threshold_db (%.1f)", c.TargetLevelDB, c.MinThresholdDB)
+	}
+	if c.MaxGainDB < 0 {
+		return fmt.Errorf("max_gain_db must be positive (gain amount)")
+	}
+	if c.MaxGainDB > 40 {
+		return fmt.Errorf("max_gain_db is too high (%.1f dB), maximum recommended is 40 dB", c.MaxGainDB)
+	}
+
 	return nil
 }
 
@@ -293,6 +335,13 @@ Settings:
   Audio Feedback:  %t
   Verbose:         %t
 
+Audio Gain Control:
+  Auto Gain:       %t
+  Target Level:    %.1f dBFS
+  Min Threshold:   %.1f dBFS
+  Max Gain:        %.1f dB
+  Show Levels:     %t
+
 Paths:
   Config:          %s
   Models:          %s
@@ -308,6 +357,11 @@ Paths:
 		c.AutoPaste,
 		c.AudioFeedback,
 		c.Verbose,
+		c.AutoGain,
+		c.TargetLevelDB,
+		c.MinThresholdDB,
+		c.MaxGainDB,
+		c.ShowAudioLevels,
 		configPath,
 		modelsDir,
 		cacheDir,
