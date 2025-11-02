@@ -27,8 +27,14 @@ type Config struct {
 	// Language is the target language for transcription (empty = auto-detect)
 	Language string `yaml:"language"`
 
-	// Hotkey is the keyboard shortcut for activation (default: Right Option)
-	Hotkey string `yaml:"hotkey"`
+	// Hotkey is the keyboard shortcut for activation (LEGACY - for backward compatibility)
+	// Deprecated: Use Triggers instead
+	Hotkey string `yaml:"hotkey,omitempty"`
+
+	// Triggers is an array of keyboard/mouse triggers for activation
+	// Examples: "Right Option", "Forward Button", "Back Button"
+	// Any trigger can be double-pressed to start/stop recording
+	Triggers []string `yaml:"triggers,omitempty"`
 
 	// AutoPaste determines whether to automatically paste transcribed text
 	AutoPaste bool `yaml:"auto_paste"`
@@ -47,7 +53,8 @@ func DefaultConfig() *Config {
 		PreferredMicrophones: []string{}, // Empty means use system default
 		Model:                "small",
 		Language:             "", // Empty means auto-detect
-		Hotkey:               "Right Option",
+		Hotkey:               "",         // Legacy field (deprecated)
+		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
 		Verbose:              false,
@@ -98,15 +105,27 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// migrate handles backward compatibility by auto-migrating legacy Microphone field
-// to PreferredMicrophones array. This ensures seamless upgrade for existing users.
+// migrate handles backward compatibility by auto-migrating legacy fields
+// to their new equivalents. This ensures seamless upgrade for existing users.
 func (c *Config) migrate() {
-	// Auto-migrate: If new field is empty but old field is set, populate new field
+	needsSave := false
+
+	// Auto-migrate: Microphone → PreferredMicrophones
 	if len(c.PreferredMicrophones) == 0 && c.Microphone != "" {
 		c.PreferredMicrophones = []string{c.Microphone}
 		log.Printf("[CONFIG] Migrated legacy 'microphone' field to 'preferred_microphones': %s", c.Microphone)
+		needsSave = true
+	}
 
-		// Optionally save migrated config immediately
+	// Auto-migrate: Hotkey → Triggers
+	if len(c.Triggers) == 0 && c.Hotkey != "" {
+		c.Triggers = []string{c.Hotkey}
+		log.Printf("[CONFIG] Migrated legacy 'hotkey' field to 'triggers': %s", c.Hotkey)
+		needsSave = true
+	}
+
+	// Save migrated config if any migrations occurred
+	if needsSave {
 		if err := c.Save(); err != nil {
 			log.Printf("[CONFIG] Warning: Failed to save migrated config: %v", err)
 		}
@@ -167,24 +186,49 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid model: %s (must be one of: tiny, base, small, medium, large)", c.Model)
 	}
 
-	// Validate hotkey (basic validation - can be expanded)
-	if c.Hotkey == "" {
-		return fmt.Errorf("hotkey cannot be empty")
+	// Validate triggers
+	if len(c.Triggers) == 0 {
+		return fmt.Errorf("triggers cannot be empty - at least one trigger is required")
 	}
 
-	// Validate hotkey is a known key
-	validHotkeys := map[string]bool{
-		"Left Option":   true,
-		"Right Option":  true,
-		"Left Shift":    true,
-		"Right Shift":   true,
-		"Left Command":  true,
-		"Right Command": true,
-		"Left Control":  true,
-		"Right Control": true,
+	// Valid trigger names (keyboard modifiers + mouse buttons)
+	validTriggers := map[string]bool{
+		"Left Option":    true,
+		"Right Option":   true,
+		"Left Shift":     true,
+		"Right Shift":    true,
+		"Left Command":   true,
+		"Right Command":  true,
+		"Left Control":   true,
+		"Right Control":  true,
+		"Forward Button": true,
+		"Back Button":    true,
 	}
-	if !validHotkeys[c.Hotkey] {
-		return fmt.Errorf("invalid hotkey: %s (must be one of: Left Option, Right Option, Left Shift, Right Shift, Left Command, Right Command, Left Control, Right Control)", c.Hotkey)
+
+	// Check each trigger
+	seenTriggers := make(map[string]bool)
+	for i, trigger := range c.Triggers {
+		trimmed := strings.TrimSpace(trigger)
+		if trimmed == "" {
+			return fmt.Errorf("triggers[%d] cannot be empty", i)
+		}
+
+		// Check for duplicates (case-insensitive)
+		lowerTrigger := strings.ToLower(trimmed)
+		if seenTriggers[lowerTrigger] {
+			return fmt.Errorf("duplicate trigger: %s", trimmed)
+		}
+		seenTriggers[lowerTrigger] = true
+
+		// Validate trigger name
+		if !validTriggers[trimmed] {
+			return fmt.Errorf("invalid trigger: %s (must be one of: Left Option, Right Option, Left Shift, Right Shift, Left Command, Right Command, Left Control, Right Control, Forward Button, Back Button)", trimmed)
+		}
+	}
+
+	// Warn if both legacy Hotkey and new Triggers are set
+	if c.Hotkey != "" && len(c.Triggers) > 0 {
+		log.Printf("[CONFIG] Warning: Both 'hotkey' (legacy) and 'triggers' are set. Using 'triggers' field.")
 	}
 
 	// Note: We don't validate language codes as Whisper supports many languages
@@ -221,6 +265,23 @@ func (c *Config) String() string {
 		language = "auto-detect"
 	}
 
+	// Format triggers list
+	var triggers string
+	if len(c.Triggers) == 0 {
+		triggers = "(none configured)"
+	} else {
+		triggers = "\n"
+		for i, trigger := range c.Triggers {
+			triggers += fmt.Sprintf("    %d. %s\n", i+1, trigger)
+		}
+	}
+
+	// Show legacy hotkey if present
+	var hotkeyDisplay string
+	if c.Hotkey != "" {
+		hotkeyDisplay = fmt.Sprintf("  Hotkey (legacy):  %s\n", c.Hotkey)
+	}
+
 	return fmt.Sprintf(`Current Configuration:
 
 Settings:
@@ -228,8 +289,7 @@ Settings:
   Preferred Mics:  %s
   Model:           %s
   Language:        %s
-  Hotkey:          %s
-  Auto-paste:      %t
+  Triggers:        %s%s  Auto-paste:      %t
   Audio Feedback:  %t
   Verbose:         %t
 
@@ -243,7 +303,8 @@ Paths:
 		preferredMics,
 		c.Model,
 		language,
-		c.Hotkey,
+		triggers,
+		hotkeyDisplay,
 		c.AutoPaste,
 		c.AudioFeedback,
 		c.Verbose,

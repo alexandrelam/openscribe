@@ -18,9 +18,9 @@ extern void goHotkeyCallback(void);
 static CFMachPortRef gEventTap = NULL;
 static CFRunLoopSourceRef gRunLoopSource = NULL;
 static CFRunLoopRef gRunLoop = NULL;
-static uint16_t gTargetKeyCode = 0;
+static uint32_t gTargetKeyCode = 0;
 
-// Event tap callback for monitoring keyboard events
+// Event tap callback for monitoring keyboard and mouse events
 static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     // Handle tap disabled event
     if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
@@ -30,7 +30,25 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEv
         return event;
     }
 
-    // Only process key down events for flags changed (modifier keys)
+    // Handle mouse button events
+    if (type == kCGEventOtherMouseDown) {
+        int64_t buttonNumber = CGEventGetIntegerValueField(event, kCGMouseEventButtonNumber);
+
+        // Map physical mouse button numbers to synthetic key codes
+        uint32_t syntheticKeyCode = 0;
+        if (buttonNumber == 3) {
+            syntheticKeyCode = 0x10002; // Back Button
+        } else if (buttonNumber == 4) {
+            syntheticKeyCode = 0x10001; // Forward Button
+        }
+
+        // If this is our target button, trigger the callback
+        if (syntheticKeyCode != 0 && syntheticKeyCode == gTargetKeyCode) {
+            goHotkeyCallback();
+        }
+    }
+
+    // Handle keyboard modifier events
     if (type == kCGEventFlagsChanged) {
         // Get the key code from the event
         int64_t keyCode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
@@ -90,7 +108,7 @@ static void requestAccessibilityPermissions() {
 }
 
 // Register a hotkey with the system using CGEventTap
-static int registerHotkey(uint16_t keyCode) {
+static int registerHotkey(uint32_t keyCode) {
     // Check accessibility permissions first
     if (checkAccessibilityPermissions() == 0) {
         return -1; // No accessibility permissions
@@ -100,7 +118,9 @@ static int registerHotkey(uint16_t keyCode) {
     gTargetKeyCode = keyCode;
 
     // Create an event tap to monitor flags changed events (for modifier keys)
-    CGEventMask eventMask = CGEventMaskBit(kCGEventFlagsChanged);
+    // and mouse button events (for mouse triggers)
+    CGEventMask eventMask = CGEventMaskBit(kCGEventFlagsChanged) |
+                            CGEventMaskBit(kCGEventOtherMouseDown);
 
     gEventTap = CGEventTapCreate(
         kCGSessionEventTap,
@@ -196,7 +216,7 @@ func (l *Listener) startEventMonitor() error {
 	currentListener = l
 
 	// Register the hotkey
-	result := C.registerHotkey(C.uint16_t(l.keyCode))
+	result := C.registerHotkey(C.uint32_t(l.keyCode))
 	if result == -1 {
 		// Request accessibility permissions
 		C.requestAccessibilityPermissions()
