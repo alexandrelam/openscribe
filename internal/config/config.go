@@ -79,9 +79,9 @@ func DefaultConfig() *Config {
 		AudioFeedback:        true,
 		Verbose:              false,
 		AutoGain:             true,   // Enable automatic gain control by default
-		TargetLevelDB:        -20.0,  // Good speech level (-20 dBFS)
-		MinThresholdDB:       -40.0,  // Below this is considered too quiet
-		MaxGainDB:            20.0,   // Maximum 20 dB of gain
+		TargetLevelDB:        -18.0,  // Optimal speech level for transcription (-18 dBFS)
+		MinThresholdDB:       -35.0,  // Below this is considered too quiet for good transcription
+		MaxGainDB:            25.0,   // Maximum 25 dB of gain (allows recovery from -43 dBFS)
 		ShowAudioLevels:      false,  // Only show in verbose mode by default
 	}
 }

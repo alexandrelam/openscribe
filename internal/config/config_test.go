@@ -21,9 +21,9 @@ func TestDefaultConfig(t *testing.T) {
 		{"AudioFeedback", cfg.AudioFeedback, true},
 		{"Verbose", cfg.Verbose, false},
 		{"AutoGain", cfg.AutoGain, true},
-		{"TargetLevelDB", cfg.TargetLevelDB, -20.0},
-		{"MinThresholdDB", cfg.MinThresholdDB, -40.0},
-		{"MaxGainDB", cfg.MaxGainDB, 20.0},
+		{"TargetLevelDB", cfg.TargetLevelDB, -18.0},
+		{"MinThresholdDB", cfg.MinThresholdDB, -35.0},
+		{"MaxGainDB", cfg.MaxGainDB, 25.0},
 		{"ShowAudioLevels", cfg.ShowAudioLevels, false},
 	}
 
@@ -791,7 +791,7 @@ func TestString_WithGainControl(t *testing.T) {
 	if !strings.Contains(output, "Target Level:") {
 		t.Error("String() should contain 'Target Level:' field")
 	}
-	if !strings.Contains(output, "-20.0 dBFS") {
-		t.Error("String() should contain default target level '-20.0 dBFS'")
+	if !strings.Contains(output, "-18.0 dBFS") {
+		t.Error("String() should contain default target level '-18.0 dBFS'")
 	}
 }
