@@ -304,6 +304,47 @@ func runStart(cmd *cobra.Command) {
 					return
 				}
 
+				// Analyze audio levels
+				levelMetrics, err := audio.AnalyzeLevel(audioData, currentRecorder.GetSampleRate())
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to analyze audio level: %v\n", err)
+				} else {
+					// Display audio levels if verbose mode or ShowAudioLevels is enabled
+					if cfg.Verbose || cfg.ShowAudioLevels {
+						fmt.Printf("🔊 Audio level: %.1f dBFS (peak: %d)\n",
+							levelMetrics.DecibelsFS, levelMetrics.PeakAmplitude)
+					}
+
+					// Check if gain control is needed
+					if cfg.AutoGain && levelMetrics.DecibelsFS < cfg.MinThresholdDB {
+						fmt.Printf("⚠️  Low audio level detected (%.1f dBFS), applying gain...\n",
+							levelMetrics.DecibelsFS)
+
+						// Create gain control config
+						gainConfig := audio.GainControlConfig{
+							Enabled:         true,
+							TargetLevelDB:   cfg.TargetLevelDB,
+							MinThresholdDB:  cfg.MinThresholdDB,
+							MaxGainDB:       cfg.MaxGainDB,
+							PreventClipping: true,
+						}
+
+						// Apply gain control
+						processedAudio, gainResult, err := audio.ProcessAudioGain(audioData, levelMetrics, gainConfig)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "Warning: Failed to apply gain control: %v\n", err)
+						} else {
+							audioData = processedAudio
+							fmt.Printf("✓ Gain applied: +%.1f dB (level now: %.1f dBFS)\n",
+								gainResult.GainAppliedDB, gainResult.ResultingLevelDB)
+						}
+					} else if !cfg.AutoGain && levelMetrics.DecibelsFS < cfg.MinThresholdDB {
+						// Warn if audio is low but auto-gain is disabled
+						fmt.Printf("⚠️  Low audio level detected (%.1f dBFS). Consider increasing microphone volume or enabling auto_gain in config.\n",
+							levelMetrics.DecibelsFS)
+					}
+				}
+
 				// Save audio to temporary WAV file
 				cacheDir, err := config.GetCacheDir()
 				if err != nil {
@@ -448,6 +489,47 @@ func runStart(cmd *cobra.Command) {
 				isTranscribing = false
 				transcribingLock.Unlock()
 				return
+			}
+
+			// Analyze audio levels
+			levelMetrics, err := audio.AnalyzeLevel(audioData, recorder.GetSampleRate())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to analyze audio level: %v\n", err)
+			} else {
+				// Display audio levels if verbose mode or ShowAudioLevels is enabled
+				if cfg.Verbose || cfg.ShowAudioLevels {
+					fmt.Printf("🔊 Audio level: %.1f dBFS (peak: %d)\n",
+						levelMetrics.DecibelsFS, levelMetrics.PeakAmplitude)
+				}
+
+				// Check if gain control is needed
+				if cfg.AutoGain && levelMetrics.DecibelsFS < cfg.MinThresholdDB {
+					fmt.Printf("⚠️  Low audio level detected (%.1f dBFS), applying gain...\n",
+						levelMetrics.DecibelsFS)
+
+					// Create gain control config
+					gainConfig := audio.GainControlConfig{
+						Enabled:         true,
+						TargetLevelDB:   cfg.TargetLevelDB,
+						MinThresholdDB:  cfg.MinThresholdDB,
+						MaxGainDB:       cfg.MaxGainDB,
+						PreventClipping: true,
+					}
+
+					// Apply gain control
+					processedAudio, gainResult, err := audio.ProcessAudioGain(audioData, levelMetrics, gainConfig)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to apply gain control: %v\n", err)
+					} else {
+						audioData = processedAudio
+						fmt.Printf("✓ Gain applied: +%.1f dB (level now: %.1f dBFS)\n",
+							gainResult.GainAppliedDB, gainResult.ResultingLevelDB)
+					}
+				} else if !cfg.AutoGain && levelMetrics.DecibelsFS < cfg.MinThresholdDB {
+					// Warn if audio is low but auto-gain is disabled
+					fmt.Printf("⚠️  Low audio level detected (%.1f dBFS). Consider increasing microphone volume or enabling auto_gain in config.\n",
+						levelMetrics.DecibelsFS)
+				}
 			}
 
 			// Save audio to temporary WAV file
