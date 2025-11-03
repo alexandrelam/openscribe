@@ -11,14 +11,28 @@ package hotkey
 #import <CoreGraphics/CoreGraphics.h>
 #import <ApplicationServices/ApplicationServices.h>
 
-// Global variable to store the Go callback
-extern void goHotkeyCallback(void);
+// Global variable to store the Go callback with keycode parameter
+extern void goHotkeyCallback(uint32_t keyCode);
 
 // Global variables for event handling
 static CFMachPortRef gEventTap = NULL;
 static CFRunLoopSourceRef gRunLoopSource = NULL;
 static CFRunLoopRef gRunLoop = NULL;
-static uint32_t gTargetKeyCode = 0;
+
+// Array to store multiple target key codes (max 16 triggers)
+#define MAX_TARGET_KEYS 16
+static uint32_t gTargetKeyCodes[MAX_TARGET_KEYS];
+static int gTargetKeyCount = 0;
+
+// Check if a keycode is in the target list
+static bool isTargetKeyCode(uint32_t keyCode) {
+    for (int i = 0; i < gTargetKeyCount; i++) {
+        if (gTargetKeyCodes[i] == keyCode) {
+            return true;
+        }
+    }
+    return false;
+}
 
 // Event tap callback for monitoring keyboard and mouse events
 static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
@@ -42,9 +56,9 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEv
             syntheticKeyCode = 0x10001; // Forward Button
         }
 
-        // If this is our target button, trigger the callback
-        if (syntheticKeyCode != 0 && syntheticKeyCode == gTargetKeyCode) {
-            goHotkeyCallback();
+        // If this is one of our target buttons, trigger the callback
+        if (syntheticKeyCode != 0 && isTargetKeyCode(syntheticKeyCode)) {
+            goHotkeyCallback(syntheticKeyCode);
         }
     }
 
@@ -56,10 +70,10 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEv
         // Get the current flags to determine if key was pressed or released
         CGEventFlags flags = CGEventGetFlags(event);
 
-        // Check if this is our target key and if it was just pressed
+        // Check if this is one of our target keys and if it was just pressed
         // We detect a press by checking if any modifier flag is set
         // (when released, the flags will be clear)
-        if (keyCode == gTargetKeyCode) {
+        if (isTargetKeyCode((uint32_t)keyCode)) {
             // Determine if key was pressed by checking relevant modifier flags
             bool isPressed = false;
 
@@ -85,7 +99,7 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEv
 
             // Only trigger callback on key press (not release)
             if (isPressed) {
-                goHotkeyCallback();
+                goHotkeyCallback((uint32_t)keyCode);
             }
         }
     }
@@ -107,15 +121,36 @@ static void requestAccessibilityPermissions() {
     AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
 }
 
-// Register a hotkey with the system using CGEventTap
-static int registerHotkey(uint32_t keyCode) {
+// Add a keycode to the list of monitored keys
+static int addKeyCode(uint32_t keyCode) {
+    // Check if already in the list
+    if (isTargetKeyCode(keyCode)) {
+        return 0; // Already added
+    }
+
+    // Check if we have space
+    if (gTargetKeyCount >= MAX_TARGET_KEYS) {
+        return -4; // Too many keys
+    }
+
+    // Add to the list
+    gTargetKeyCodes[gTargetKeyCount] = keyCode;
+    gTargetKeyCount++;
+
+    return 0;
+}
+
+// Initialize the event tap (called once for all keys)
+static int initializeEventTap() {
     // Check accessibility permissions first
     if (checkAccessibilityPermissions() == 0) {
         return -1; // No accessibility permissions
     }
 
-    // Store the target key code
-    gTargetKeyCode = keyCode;
+    // Only create event tap if not already created
+    if (gEventTap != NULL) {
+        return 0; // Already initialized
+    }
 
     // Create an event tap to monitor flags changed events (for modifier keys)
     // and mouse button events (for mouse triggers)
@@ -146,8 +181,8 @@ static int registerHotkey(uint32_t keyCode) {
     return 0;
 }
 
-// Unregister the hotkey
-static void unregisterHotkey() {
+// Unregister all hotkeys and clean up
+static void unregisterHotkeys() {
     if (gRunLoopSource != NULL && gRunLoop != NULL) {
         CFRunLoopRemoveSource(gRunLoop, gRunLoopSource, kCFRunLoopCommonModes);
         CFRelease(gRunLoopSource);
@@ -160,7 +195,11 @@ static void unregisterHotkey() {
         gEventTap = NULL;
     }
 
-    gTargetKeyCode = 0;
+    // Clear the keycode list
+    gTargetKeyCount = 0;
+    for (int i = 0; i < MAX_TARGET_KEYS; i++) {
+        gTargetKeyCodes[i] = 0;
+    }
 }
 
 // Start the event loop in a separate thread
@@ -195,53 +234,92 @@ import "C"
 import (
 	"fmt"
 	"runtime"
+	"sync"
 )
 
-// Global reference to the current listener for the C callback
-var currentListener *Listener
+// Global map to store listeners by keycode for the C callback
+var (
+	listenerMap   = make(map[KeyCode]*Listener)
+	listenerMutex sync.RWMutex
+	eventLoopOnce sync.Once
+)
 
 //export goHotkeyCallback
-func goHotkeyCallback() {
-	if currentListener != nil {
-		currentListener.handleKeyPress()
+func goHotkeyCallback(keyCode C.uint32_t) {
+	listenerMutex.RLock()
+	listener := listenerMap[KeyCode(keyCode)]
+	listenerMutex.RUnlock()
+
+	if listener != nil {
+		listener.handleKeyPress()
 	}
 }
 
 // startEventMonitor starts monitoring for hotkey events (macOS-specific)
 func (l *Listener) startEventMonitor() error {
-	// Lock the OS thread for Carbon/Cocoa APIs
-	runtime.LockOSThread()
+	// Initialize event tap once for all listeners
+	var initErr error
+	eventLoopOnce.Do(func() {
+		// Lock the OS thread for Carbon/Cocoa APIs
+		runtime.LockOSThread()
 
-	// Set the current listener so the C callback can find it
-	currentListener = l
+		// Initialize the event tap
+		result := C.initializeEventTap()
+		if result == -1 {
+			// Request accessibility permissions
+			C.requestAccessibilityPermissions()
+			initErr = fmt.Errorf("accessibility permissions required: please grant permissions in System Preferences > Security & Privacy > Privacy > Accessibility, then restart OpenScribe")
+			return
+		} else if result == -2 {
+			initErr = fmt.Errorf("failed to create event tap for hotkey monitoring")
+			return
+		} else if result == -3 {
+			initErr = fmt.Errorf("failed to create run loop source for hotkey monitoring")
+			return
+		} else if result != 0 {
+			initErr = fmt.Errorf("failed to initialize event tap (error code: %d)", result)
+			return
+		}
 
-	// Register the hotkey
-	result := C.registerHotkey(C.uint32_t(l.keyCode))
-	if result == -1 {
-		// Request accessibility permissions
-		C.requestAccessibilityPermissions()
-		return fmt.Errorf("accessibility permissions required: please grant permissions in System Preferences > Security & Privacy > Privacy > Accessibility, then restart OpenScribe")
-	} else if result == -2 {
-		return fmt.Errorf("failed to create event tap for hotkey monitoring")
-	} else if result == -3 {
-		return fmt.Errorf("failed to create run loop source for hotkey monitoring")
-	} else if result != 0 {
-		return fmt.Errorf("failed to register hotkey (error code: %d)", result)
+		// Start the event loop in a goroutine
+		go func() {
+			runtime.LockOSThread()
+			C.runEventLoop(nil)
+		}()
+	})
+
+	if initErr != nil {
+		return initErr
 	}
 
-	// Start the event loop in a goroutine
-	go func() {
-		runtime.LockOSThread()
-		C.runEventLoop(nil)
-	}()
+	// Add this keycode to the monitored list
+	result := C.addKeyCode(C.uint32_t(l.keyCode))
+	if result == -4 {
+		return fmt.Errorf("too many triggers configured (maximum %d)", 16)
+	} else if result != 0 {
+		return fmt.Errorf("failed to add trigger (error code: %d)", result)
+	}
+
+	// Register this listener in the global map
+	listenerMutex.Lock()
+	listenerMap[l.keyCode] = l
+	listenerMutex.Unlock()
 
 	return nil
 }
 
 // stopEventMonitor stops monitoring for hotkey events (macOS-specific)
 func (l *Listener) stopEventMonitor() {
-	C.stopEventLoop()
-	C.unregisterHotkey()
-	currentListener = nil
-	runtime.UnlockOSThread()
+	// Remove this listener from the map
+	listenerMutex.Lock()
+	delete(listenerMap, l.keyCode)
+	isEmpty := len(listenerMap) == 0
+	listenerMutex.Unlock()
+
+	// If this was the last listener, clean up the event tap
+	if isEmpty {
+		C.stopEventLoop()
+		C.unregisterHotkeys()
+		runtime.UnlockOSThread()
+	}
 }
