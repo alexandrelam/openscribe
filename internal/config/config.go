@@ -149,6 +149,18 @@ func (c *Config) migrate() {
 		needsSave = true
 	}
 
+	// Auto-migrate: Add gain control defaults if missing (zero values)
+	// This handles configs created before gain control was added
+	if c.TargetLevelDB == 0 && c.MinThresholdDB == 0 && c.MaxGainDB == 0 {
+		defaults := DefaultConfig()
+		c.TargetLevelDB = defaults.TargetLevelDB
+		c.MinThresholdDB = defaults.MinThresholdDB
+		c.MaxGainDB = defaults.MaxGainDB
+		log.Printf("[CONFIG] Migrated gain control settings to defaults (target: %.1f dBFS, threshold: %.1f dBFS, max gain: %.1f dB)",
+			c.TargetLevelDB, c.MinThresholdDB, c.MaxGainDB)
+		needsSave = true
+	}
+
 	// Save migrated config if any migrations occurred
 	if needsSave {
 		if err := c.Save(); err != nil {
