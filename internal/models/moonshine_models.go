@@ -16,7 +16,8 @@ type MoonshineModelSize string
 const (
 	MoonshineTiny           MoonshineModelSize = "tiny"
 	MoonshineBase           MoonshineModelSize = "base"
-	MoonshineSmallStreaming MoonshineModelSize = "small-streaming"
+	MoonshineSmallStreaming  MoonshineModelSize = "small-streaming"
+	MoonshineMediumStreaming MoonshineModelSize = "medium-streaming"
 )
 
 // MoonshineModelInfo contains metadata about a Moonshine model
@@ -48,6 +49,12 @@ var AvailableMoonshineModels = map[MoonshineModelSize]MoonshineModelInfo{
 		Description:   "Best English accuracy (~157 MB)",
 		RequiredFiles: []string{"adapter.ort", "cross_kv.ort", "decoder_kv.ort", "encoder.ort", "frontend.ort", "streaming_config.json", "tokenizer.bin"},
 		BaseURL:       "https://download.moonshine.ai/model/small-streaming-en/quantized/",
+	},
+	MoonshineMediumStreaming: {
+		Name:          MoonshineMediumStreaming,
+		Description:   "Highest accuracy, largest (~289 MB)",
+		RequiredFiles: []string{"adapter.ort", "cross_kv.ort", "decoder_kv.ort", "encoder.ort", "frontend.ort", "streaming_config.json", "tokenizer.bin"},
+		BaseURL:       "https://download.moonshine.ai/model/medium-streaming-en/quantized/",
 	},
 }
 

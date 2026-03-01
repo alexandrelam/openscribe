@@ -27,7 +27,8 @@ import (
 var ModelArch = map[string]C.uint32_t{
 	"tiny":            C.MOONSHINE_MODEL_ARCH_TINY,
 	"base":            C.MOONSHINE_MODEL_ARCH_BASE,
-	"small-streaming": C.MOONSHINE_MODEL_ARCH_SMALL_STREAMING,
+	"small-streaming":  C.MOONSHINE_MODEL_ARCH_SMALL_STREAMING,
+	"medium-streaming": C.MOONSHINE_MODEL_ARCH_MEDIUM_STREAMING,
 }
 
 // Transcriber wraps the Moonshine C library for speech-to-text.

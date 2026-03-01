@@ -248,10 +248,11 @@ func (c *Config) Validate() error {
 		validMoonshineModels := map[string]bool{
 			"tiny":            true,
 			"base":            true,
-			"small-streaming": true,
+			"small-streaming":  true,
+			"medium-streaming": true,
 		}
 		if !validMoonshineModels[c.MoonshineModel] {
-			return fmt.Errorf("invalid moonshine_model: %s (must be one of: tiny, base, small-streaming)", c.MoonshineModel)
+			return fmt.Errorf("invalid moonshine_model: %s (must be one of: tiny, base, small-streaming, medium-streaming)", c.MoonshineModel)
 		}
 	}
 

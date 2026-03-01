@@ -308,12 +308,60 @@ Fallback: System default microphone
 openscribe config --set-model small
 ```
 
-Available models:
+Available Whisper models:
 - `tiny` - Fastest, least accurate (~75MB)
 - `base` - Fast, good for simple speech (~145MB)
 - `small` - **Recommended** - Balanced speed/accuracy (~500MB)
 - `medium` - Slower, more accurate (~1.5GB)
 - `large` - Slowest, most accurate (~3GB)
+
+### Moonshine Backend
+
+OpenScribe supports [Moonshine](https://github.com/usefulsensors/moonshine) as an alternative transcription backend. Moonshine models are optimized for fast, on-device speech recognition.
+
+#### Setting Up Moonshine
+
+1. **Build OpenScribe with Moonshine support:**
+   ```bash
+   make build-moonshine
+   ```
+
+2. **Download a Moonshine model:**
+   ```bash
+   openscribe models download --backend moonshine medium-streaming
+   ```
+
+3. **Switch to the Moonshine backend:**
+   ```bash
+   openscribe config --open
+   ```
+   Then set the following in your `config.yaml`:
+   ```yaml
+   backend: moonshine
+   moonshine_model: medium-streaming
+   ```
+
+4. **Start OpenScribe as usual:**
+   ```bash
+   openscribe start
+   ```
+
+#### Available Moonshine Models
+
+| Model | Size | Description |
+|-------|------|-------------|
+| `tiny` | ~42 MB | Fastest, smallest |
+| `base` | ~80 MB | Better accuracy, larger |
+| `small-streaming` | ~157 MB | Best English accuracy |
+| `medium-streaming` | ~289 MB | **Recommended** - Highest accuracy, largest |
+
+```bash
+# List available Moonshine models and download status
+openscribe models list --backend moonshine
+
+# Download a specific model
+openscribe models download --backend moonshine small-streaming
+```
 
 ### Configure Language
 

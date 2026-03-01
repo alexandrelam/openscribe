@@ -116,7 +116,7 @@ func listMoonshineModels() {
 		downloadedMap[model] = true
 	}
 
-	modelOrder := []models.MoonshineModelSize{models.MoonshineTiny, models.MoonshineBase, models.MoonshineSmallStreaming}
+	modelOrder := []models.MoonshineModelSize{models.MoonshineTiny, models.MoonshineBase, models.MoonshineSmallStreaming, models.MoonshineMediumStreaming}
 
 	for _, modelName := range modelOrder {
 		info := models.AvailableMoonshineModels[modelName]
