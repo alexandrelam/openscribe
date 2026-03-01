@@ -25,8 +25,9 @@ import (
 
 // ModelArch maps model size names to the C constants
 var ModelArch = map[string]C.uint32_t{
-	"tiny": C.MOONSHINE_MODEL_ARCH_TINY,
-	"base": C.MOONSHINE_MODEL_ARCH_BASE,
+	"tiny":            C.MOONSHINE_MODEL_ARCH_TINY,
+	"base":            C.MOONSHINE_MODEL_ARCH_BASE,
+	"small-streaming": C.MOONSHINE_MODEL_ARCH_SMALL_STREAMING,
 }
 
 // Transcriber wraps the Moonshine C library for speech-to-text.

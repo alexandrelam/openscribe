@@ -246,11 +246,12 @@ func (c *Config) Validate() error {
 	// Validate moonshine model if backend is moonshine
 	if c.Backend == "moonshine" && c.MoonshineModel != "" {
 		validMoonshineModels := map[string]bool{
-			"tiny": true,
-			"base": true,
+			"tiny":            true,
+			"base":            true,
+			"small-streaming": true,
 		}
 		if !validMoonshineModels[c.MoonshineModel] {
-			return fmt.Errorf("invalid moonshine_model: %s (must be one of: tiny, base)", c.MoonshineModel)
+			return fmt.Errorf("invalid moonshine_model: %s (must be one of: tiny, base, small-streaming)", c.MoonshineModel)
 		}
 	}
 
