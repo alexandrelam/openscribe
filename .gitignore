@@ -49,3 +49,5 @@ tmp/
 # Test fixtures (if containing sensitive data)
 tests/fixtures/*.yaml
 !tests/fixtures/test_config.yaml
+
+third_party/

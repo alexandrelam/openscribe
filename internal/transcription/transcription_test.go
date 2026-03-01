@@ -7,8 +7,6 @@ import (
 )
 
 func TestParseOutput(t *testing.T) {
-	transcriber := &Transcriber{}
-
 	tests := []struct {
 		name     string
 		input    string
@@ -54,17 +52,15 @@ Third line.`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := transcriber.parseOutput(tt.input)
+			result := parseWhisperOutput(tt.input)
 			if result != tt.expected {
-				t.Errorf("parseOutput() = %q, want %q", result, tt.expected)
+				t.Errorf("parseWhisperOutput() = %q, want %q", result, tt.expected)
 			}
 		})
 	}
 }
 
 func TestExtractLanguage(t *testing.T) {
-	transcriber := &Transcriber{}
-
 	tests := []struct {
 		name     string
 		input    string
@@ -99,9 +95,9 @@ func TestExtractLanguage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := transcriber.extractLanguage(tt.input)
+			result := extractWhisperLanguage(tt.input)
 			if result != tt.expected {
-				t.Errorf("extractLanguage() = %q, want %q", result, tt.expected)
+				t.Errorf("extractWhisperLanguage() = %q, want %q", result, tt.expected)
 			}
 		})
 	}
@@ -123,30 +119,22 @@ func TestDefaultOptions(t *testing.T) {
 	}
 }
 
-func TestNewTranscriber(t *testing.T) {
-	// This test checks if whisper-cli can be found
-	// It will skip gracefully if not installed (e.g., in CI)
-	transcriber, err := NewTranscriber()
+func TestNewWhisperTranscriber(t *testing.T) {
+	transcriber, err := NewWhisperTranscriber()
 
-	// If whisper-cli is not installed, we expect an error
 	if err != nil {
 		if transcriber != nil {
-			t.Error("NewTranscriber() returned both error and non-nil transcriber")
+			t.Error("NewWhisperTranscriber() returned both error and non-nil transcriber")
 		}
-		// This is expected if whisper-cli is not installed (e.g., in CI)
 		t.Skipf("whisper-cli not installed, skipping test: %v", err)
 		return
 	}
 
-	// If no error, transcriber should be valid
 	if transcriber == nil {
-		t.Fatal("NewTranscriber() returned nil transcriber with no error")
+		t.Fatal("NewWhisperTranscriber() returned nil transcriber with no error")
 	}
 
 	if transcriber.whisperPath == "" {
-		t.Error("NewTranscriber() created transcriber with empty whisperPath")
+		t.Error("NewWhisperTranscriber() created transcriber with empty whisperPath")
 	}
 }
-
-// Note: Integration tests with real audio files are in integration_test.go
-// Run them with: go test -tags=integration ./internal/transcription/...

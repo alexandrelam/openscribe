@@ -77,6 +77,28 @@ lint:
 	@echo "Running linter..."
 	golangci-lint run
 
+# Build with Moonshine support (requires vendored native libs)
+build-moonshine:
+	@echo "Building $(BINARY_NAME) $(VERSION) with Moonshine support..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=1 $(GOBUILD) $(LDFLAGS) -tags moonshine -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/openscribe
+
+# Download and extract Moonshine native dependencies from XCFramework
+moonshine-deps:
+	@echo "Downloading Moonshine XCFramework..."
+	@mkdir -p third_party/moonshine/include third_party/moonshine/lib
+	@curl -sL -o /tmp/Moonshine.xcframework.zip \
+		"https://github.com/moonshine-ai/moonshine-swift/releases/download/v0.0.49/Moonshine.xcframework.zip"
+	@echo "Extracting native library and header..."
+	@unzip -jo /tmp/Moonshine.xcframework.zip \
+		"Moonshine.xcframework/macos-arm64_x86_64/libmoonshine.a" \
+		-d third_party/moonshine/lib/
+	@unzip -jo /tmp/Moonshine.xcframework.zip \
+		"Moonshine.xcframework/macos-arm64_x86_64/Headers/moonshine-c-api.h" \
+		-d third_party/moonshine/include/
+	@rm -f /tmp/Moonshine.xcframework.zip
+	@echo "Done! Native deps extracted to third_party/moonshine/"
+
 # Display help
 help:
 	@echo "OpenScribe Makefile Commands:"
@@ -90,8 +112,10 @@ help:
 	@echo "  make deps                - Download and tidy dependencies"
 	@echo "  make fmt                 - Format code"
 	@echo "  make lint                - Run linter"
+	@echo "  make build-moonshine     - Build with Moonshine support (requires native libs)"
+	@echo "  make moonshine-deps      - Show instructions for Moonshine native deps"
 	@echo "  make help                - Display this help message"
 	@echo ""
 	@echo "Note: OpenScribe only supports macOS Apple Silicon (M1/M2/M3/M4)"
 
-.PHONY: build build-darwin-arm64 build-all install run clean test deps fmt lint help
+.PHONY: build build-darwin-arm64 build-all build-moonshine moonshine-deps install run clean test deps fmt lint help

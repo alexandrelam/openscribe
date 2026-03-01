@@ -52,8 +52,17 @@ func runStart(cmd *cobra.Command) {
 		// Prepend it to the preferences list
 		cfg.PreferredMicrophones = append([]string{micOverride}, cfg.PreferredMicrophones...)
 	}
+	if cmd.Flags().Changed("backend") {
+		cfg.Backend, _ = cmd.Flags().GetString("backend")
+	}
 	if cmd.Flags().Changed("model") {
-		cfg.Model, _ = cmd.Flags().GetString("model")
+		modelOverride, _ := cmd.Flags().GetString("model")
+		// When backend is moonshine, --model sets the moonshine model
+		if cfg.Backend == "moonshine" {
+			cfg.MoonshineModel = modelOverride
+		} else {
+			cfg.Model = modelOverride
+		}
 	}
 	if cmd.Flags().Changed("language") {
 		cfg.Language, _ = cmd.Flags().GetString("language")
@@ -73,54 +82,85 @@ func runStart(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
-	// Parse model size
-	modelSize, err := models.ParseModelSize(cfg.Model)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Invalid model '%s': %v\n", cfg.Model, err)
-		os.Exit(1)
+	// Parse model size and check downloads based on backend
+	var modelSize models.ModelSize
+	var moonModel string
+	backend := cfg.Backend
+	if backend == "" {
+		backend = "whisper"
 	}
 
-	// Check if model is downloaded
-	isDownloaded, err := models.IsModelDownloaded(modelSize)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking if model is downloaded: %v\n", err)
-		os.Exit(1)
-	}
-	if !isDownloaded {
-		// Check if any other models are downloaded
-		downloadedModels, listErr := models.ListDownloadedModels()
-
-		fmt.Fprintf(os.Stderr, "⚠️  Model '%s' is not downloaded!\n\n", cfg.Model)
-
-		if listErr == nil && len(downloadedModels) > 0 {
-			// Suggest using an available model
-			fmt.Fprintf(os.Stderr, "You have these models downloaded:\n")
-			for _, m := range downloadedModels {
-				fmt.Fprintf(os.Stderr, "  - %s\n", m)
-			}
-			fmt.Fprintf(os.Stderr, "\nYou can:\n")
-			fmt.Fprintf(os.Stderr, "  1. Use an available model:\n")
-			fmt.Fprintf(os.Stderr, "     $ openscribe start --model %s\n\n", downloadedModels[0])
-			fmt.Fprintf(os.Stderr, "  2. Update your config:\n")
-			fmt.Fprintf(os.Stderr, "     $ openscribe config set model %s\n\n", downloadedModels[0])
-			fmt.Fprintf(os.Stderr, "  3. Download the '%s' model:\n", cfg.Model)
-			fmt.Fprintf(os.Stderr, "     $ openscribe models download %s\n\n", cfg.Model)
-		} else {
-			// No models available
-			fmt.Fprintf(os.Stderr, "Please run setup to download a model:\n")
-			fmt.Fprintf(os.Stderr, "  $ openscribe setup\n\n")
-			fmt.Fprintf(os.Stderr, "Or download a specific model:\n")
-			fmt.Fprintf(os.Stderr, "  $ openscribe models download %s\n\n", cfg.Model)
+	if backend == "whisper" {
+		var err error
+		modelSize, err = models.ParseModelSize(cfg.Model)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid model '%s': %v\n", cfg.Model, err)
+			os.Exit(1)
 		}
-		os.Exit(1)
+
+		isDownloaded, err := models.IsModelDownloaded(modelSize)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error checking if model is downloaded: %v\n", err)
+			os.Exit(1)
+		}
+		if !isDownloaded {
+			downloadedModels, listErr := models.ListDownloadedModels()
+
+			fmt.Fprintf(os.Stderr, "⚠️  Model '%s' is not downloaded!\n\n", cfg.Model)
+
+			if listErr == nil && len(downloadedModels) > 0 {
+				fmt.Fprintf(os.Stderr, "You have these models downloaded:\n")
+				for _, m := range downloadedModels {
+					fmt.Fprintf(os.Stderr, "  - %s\n", m)
+				}
+				fmt.Fprintf(os.Stderr, "\nYou can:\n")
+				fmt.Fprintf(os.Stderr, "  1. Use an available model:\n")
+				fmt.Fprintf(os.Stderr, "     $ openscribe start --model %s\n\n", downloadedModels[0])
+				fmt.Fprintf(os.Stderr, "  2. Update your config:\n")
+				fmt.Fprintf(os.Stderr, "     $ openscribe config set model %s\n\n", downloadedModels[0])
+				fmt.Fprintf(os.Stderr, "  3. Download the '%s' model:\n", cfg.Model)
+				fmt.Fprintf(os.Stderr, "     $ openscribe models download %s\n\n", cfg.Model)
+			} else {
+				fmt.Fprintf(os.Stderr, "Please run setup to download a model:\n")
+				fmt.Fprintf(os.Stderr, "  $ openscribe setup\n\n")
+				fmt.Fprintf(os.Stderr, "Or download a specific model:\n")
+				fmt.Fprintf(os.Stderr, "  $ openscribe models download %s\n\n", cfg.Model)
+			}
+			os.Exit(1)
+		}
+	} else if backend == "moonshine" {
+		moonModel = cfg.MoonshineModel
+		if moonModel == "" {
+			moonModel = "tiny"
+		}
+		moonSize, err := models.ParseMoonshineModelSize(moonModel)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid moonshine model '%s': %v\n", moonModel, err)
+			os.Exit(1)
+		}
+		isDownloaded, err := models.IsMoonshineModelDownloaded(moonSize)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error checking moonshine model: %v\n", err)
+			os.Exit(1)
+		}
+		if !isDownloaded {
+			fmt.Fprintf(os.Stderr, "⚠️  Moonshine model '%s' is not downloaded!\n\n", moonModel)
+			fmt.Fprintf(os.Stderr, "Download it with:\n")
+			fmt.Fprintf(os.Stderr, "  $ openscribe models download --backend moonshine %s\n\n", moonModel)
+			os.Exit(1)
+		}
 	}
 
-	// Create transcriber
-	transcriber, err := transcription.NewTranscriber()
+	// Create transcriber using the configured backend
+	transcriber, err := transcription.New(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: whisper-cpp is not installed.\n\n")
-		fmt.Fprintf(os.Stderr, "Please install whisper.cpp via Homebrew:\n")
-		fmt.Fprintf(os.Stderr, "  brew install whisper-cpp\n\n")
+		if backend == "whisper" {
+			fmt.Fprintf(os.Stderr, "Error: whisper-cpp is not installed.\n\n")
+			fmt.Fprintf(os.Stderr, "Please install whisper.cpp via Homebrew:\n")
+			fmt.Fprintf(os.Stderr, "  brew install whisper-cpp\n\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Error initializing %s backend: %v\n\n", backend, err)
+		}
 		os.Exit(1)
 	}
 
@@ -143,8 +183,13 @@ func runStart(cmd *cobra.Command) {
 
 	fmt.Printf("OpenScribe v%s Starting...\n", Version)
 	fmt.Printf("  Build:           %s (%s)\n", GitCommit, BuildDate)
+	fmt.Printf("  Backend:         %s\n", backend)
 	fmt.Printf("  Microphone:      %s\n", selectedDevice.Name)
-	fmt.Printf("  Model:           %s\n", cfg.Model)
+	if backend == "moonshine" {
+		fmt.Printf("  Model:           %s (moonshine)\n", moonModel)
+	} else {
+		fmt.Printf("  Model:           %s\n", cfg.Model)
+	}
 	fmt.Printf("  Language:        %s\n", language)
 	fmt.Printf("  Triggers:        %s (double-press)\n", triggersDisplay)
 	fmt.Printf("  Auto-paste:      %t\n", cfg.AutoPaste)
@@ -674,4 +719,5 @@ func init() {
 	startCmd.Flags().StringP("language", "l", "", "Override language setting")
 	startCmd.Flags().Bool("no-paste", false, "Disable auto-paste")
 	startCmd.Flags().BoolP("verbose", "v", false, "Enable verbose debug output")
+	startCmd.Flags().String("backend", "", "Transcription backend (whisper or moonshine)")
 }

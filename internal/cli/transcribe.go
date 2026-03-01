@@ -74,7 +74,7 @@ func runTranscribe(_ *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Create transcriber
-	transcriber, err := transcription.NewTranscriber()
+	transcriber, err := transcription.NewWhisperTranscriber()
 	if err != nil {
 		return err
 	}

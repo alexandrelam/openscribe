@@ -200,6 +200,71 @@ func FormatSpeed(bytesPerSecond float64) string {
 	return fmt.Sprintf("%s/s", FormatBytes(int64(bytesPerSecond)))
 }
 
+// downloadFile downloads a URL to a local file path with progress reporting
+func downloadFile(url, destPath string, progress ProgressCallback) error {
+	tempFile := destPath + ".tmp"
+
+	client := &http.Client{
+		Timeout: 5 * time.Minute,
+	}
+
+	var resp *http.Response
+	var httpErr error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, httpErr = client.Get(url)
+		if httpErr == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			continue
+		}
+		if httpErr != nil {
+			return fmt.Errorf("failed to download after %d attempts: %w", maxRetries, httpErr)
+		}
+		return fmt.Errorf("failed to download after %d attempts: HTTP %d", maxRetries, resp.StatusCode)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	out, err := os.Create(tempFile)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+
+	reader := &progressReader{
+		reader:   resp.Body,
+		total:    resp.ContentLength,
+		callback: progress,
+	}
+
+	if _, err = io.Copy(out, reader); err != nil {
+		_ = os.Remove(tempFile)
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tempFile)
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+
+	if err := os.Rename(tempFile, destPath); err != nil {
+		_ = os.Remove(tempFile)
+		return fmt.Errorf("failed to finalize file: %w", err)
+	}
+
+	return nil
+}
+
 // EstimateTimeRemaining estimates the time remaining for a download
 func EstimateTimeRemaining(downloaded, total int64, bytesPerSecond float64) string {
 	if bytesPerSecond == 0 || total == 0 {

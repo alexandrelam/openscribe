@@ -42,6 +42,12 @@ type Config struct {
 	// AudioFeedback determines whether to play sounds on state changes
 	AudioFeedback bool `yaml:"audio_feedback"`
 
+	// Backend selects the transcription engine ("whisper" or "moonshine")
+	Backend string `yaml:"backend"`
+
+	// MoonshineModel is the Moonshine model to use (tiny, base)
+	MoonshineModel string `yaml:"moonshine_model,omitempty"`
+
 	// Verbose enables detailed debug output
 	Verbose bool `yaml:"verbose"`
 
@@ -77,6 +83,8 @@ func DefaultConfig() *Config {
 		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
+		Backend:              "whisper",
+		MoonshineModel:       "",
 		Verbose:              false,
 		AutoGain:             true,   // Enable automatic gain control by default
 		TargetLevelDB:        -18.0,  // Optimal speech level for transcription (-18 dBFS)
@@ -211,16 +219,39 @@ func (c *Config) Validate() error {
 		seen[lowerMic] = true
 	}
 
-	// Validate model
-	validModels := map[string]bool{
-		"tiny":   true,
-		"base":   true,
-		"small":  true,
-		"medium": true,
-		"large":  true,
+	// Validate backend
+	validBackends := map[string]bool{
+		"":          true,
+		"whisper":   true,
+		"moonshine": true,
 	}
-	if c.Model != "" && !validModels[c.Model] {
-		return fmt.Errorf("invalid model: %s (must be one of: tiny, base, small, medium, large)", c.Model)
+	if !validBackends[c.Backend] {
+		return fmt.Errorf("invalid backend: %s (must be one of: whisper, moonshine)", c.Backend)
+	}
+
+	// Validate model (only enforce whisper model names when backend is whisper)
+	if c.Backend == "" || c.Backend == "whisper" {
+		validModels := map[string]bool{
+			"tiny":   true,
+			"base":   true,
+			"small":  true,
+			"medium": true,
+			"large":  true,
+		}
+		if c.Model != "" && !validModels[c.Model] {
+			return fmt.Errorf("invalid model: %s (must be one of: tiny, base, small, medium, large)", c.Model)
+		}
+	}
+
+	// Validate moonshine model if backend is moonshine
+	if c.Backend == "moonshine" && c.MoonshineModel != "" {
+		validMoonshineModels := map[string]bool{
+			"tiny": true,
+			"base": true,
+		}
+		if !validMoonshineModels[c.MoonshineModel] {
+			return fmt.Errorf("invalid moonshine_model: %s (must be one of: tiny, base)", c.MoonshineModel)
+		}
 	}
 
 	// Validate triggers
@@ -336,9 +367,25 @@ func (c *Config) String() string {
 		hotkeyDisplay = fmt.Sprintf("  Hotkey (legacy):  %s\n", c.Hotkey)
 	}
 
+	backend := c.Backend
+	if backend == "" {
+		backend = "whisper"
+	}
+
+	// Show moonshine model if relevant
+	var moonshineDisplay string
+	if c.Backend == "moonshine" {
+		mm := c.MoonshineModel
+		if mm == "" {
+			mm = "tiny"
+		}
+		moonshineDisplay = fmt.Sprintf("\n  Moonshine Model: %s", mm)
+	}
+
 	return fmt.Sprintf(`Current Configuration:
 
 Settings:
+  Backend:         %s%s
   Microphone:      %s (legacy)
   Preferred Mics:  %s
   Model:           %s
@@ -360,6 +407,8 @@ Paths:
   Cache:           %s
   Logs:            %s
 `,
+		backend,
+		moonshineDisplay,
 		microphone,
 		preferredMics,
 		c.Model,
