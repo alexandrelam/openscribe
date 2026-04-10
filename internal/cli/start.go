@@ -90,7 +90,15 @@ func runStart(cmd *cobra.Command) {
 		backend = "whisper"
 	}
 
-	if backend == "whisper" {
+	if backend == "openai" {
+		// OpenAI backend: no local model needed, just validate API key
+		if cfg.OpenAIAPIKey == "" {
+			fmt.Fprintf(os.Stderr, "Error: OpenAI backend requires an API key.\n\n")
+			fmt.Fprintf(os.Stderr, "Set your API key with:\n")
+			fmt.Fprintf(os.Stderr, "  openscribe config --set-openai-api-key <your-key>\n\n")
+			os.Exit(1)
+		}
+	} else if backend == "whisper" {
 		var err error
 		modelSize, err = models.ParseModelSize(cfg.Model)
 		if err != nil {
@@ -154,11 +162,16 @@ func runStart(cmd *cobra.Command) {
 	// Create transcriber using the configured backend
 	transcriber, err := transcription.New(cfg)
 	if err != nil {
-		if backend == "whisper" {
+		switch backend {
+		case "whisper":
 			fmt.Fprintf(os.Stderr, "Error: whisper-cpp is not installed.\n\n")
 			fmt.Fprintf(os.Stderr, "Please install whisper.cpp via Homebrew:\n")
 			fmt.Fprintf(os.Stderr, "  brew install whisper-cpp\n\n")
-		} else {
+		case "openai":
+			fmt.Fprintf(os.Stderr, "Error initializing OpenAI backend: %v\n\n", err)
+			fmt.Fprintf(os.Stderr, "Check your API key with:\n")
+			fmt.Fprintf(os.Stderr, "  openscribe config --show\n\n")
+		default:
 			fmt.Fprintf(os.Stderr, "Error initializing %s backend: %v\n\n", backend, err)
 		}
 		os.Exit(1)
@@ -185,9 +198,16 @@ func runStart(cmd *cobra.Command) {
 	fmt.Printf("  Build:           %s (%s)\n", GitCommit, BuildDate)
 	fmt.Printf("  Backend:         %s\n", backend)
 	fmt.Printf("  Microphone:      %s\n", selectedDevice.Name)
-	if backend == "moonshine" {
+	switch backend {
+	case "moonshine":
 		fmt.Printf("  Model:           %s (moonshine)\n", moonModel)
-	} else {
+	case "openai":
+		om := cfg.OpenAIModel
+		if om == "" {
+			om = "gpt-4o-transcribe"
+		}
+		fmt.Printf("  Model:           %s (openai)\n", om)
+	default:
 		fmt.Printf("  Model:           %s\n", cfg.Model)
 	}
 	fmt.Printf("  Language:        %s\n", language)
@@ -719,5 +739,5 @@ func init() {
 	startCmd.Flags().StringP("language", "l", "", "Override language setting")
 	startCmd.Flags().Bool("no-paste", false, "Disable auto-paste")
 	startCmd.Flags().BoolP("verbose", "v", false, "Enable verbose debug output")
-	startCmd.Flags().String("backend", "", "Transcription backend (whisper or moonshine)")
+	startCmd.Flags().String("backend", "", "Transcription backend (whisper, moonshine, or openai)")
 }

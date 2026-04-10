@@ -28,6 +28,8 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-model") &&
 			!cmd.Flags().Changed("set-language") &&
 			!cmd.Flags().Changed("set-hotkey") &&
+			!cmd.Flags().Changed("set-openai-api-key") &&
+			!cmd.Flags().Changed("set-openai-model") &&
 			!cmd.Flags().Changed("enable-audio-feedback") &&
 			!cmd.Flags().Changed("disable-audio-feedback") &&
 			!cmd.Flags().Changed("show-preferences") &&
@@ -107,6 +109,18 @@ var configCmd = &cobra.Command{
 		if cmd.Flags().Changed("set-hotkey") {
 			value, _ := cmd.Flags().GetString("set-hotkey")
 			handleSetConfig("hotkey", value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-openai-api-key") {
+			value, _ := cmd.Flags().GetString("set-openai-api-key")
+			handleSetOpenAIAPIKey(value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-openai-model") {
+			value, _ := cmd.Flags().GetString("set-openai-model")
+			handleSetOpenAIModel(value)
 			return
 		}
 
@@ -522,6 +536,53 @@ func handleClearPreferences() {
 	fmt.Println("Configuration saved successfully!")
 }
 
+func handleSetOpenAIAPIKey(key string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.OpenAIAPIKey = key
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if key == "" {
+		fmt.Println("OpenAI API key cleared.")
+	} else {
+		fmt.Printf("OpenAI API key set: %s...%s\n", key[:7], key[len(key)-4:])
+	}
+	fmt.Println("Configuration saved successfully!")
+	fmt.Println("\nTo use OpenAI transcription, set the backend:")
+	fmt.Println("  openscribe config --set-model openai")
+	fmt.Println("  (or use: openscribe start --backend openai)")
+}
+
+func handleSetOpenAIModel(model string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.OpenAIModel = model
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if model == "" {
+		fmt.Println("OpenAI model reset to default (gpt-4o-transcribe).")
+	} else {
+		fmt.Printf("OpenAI model set to: %s\n", model)
+	}
+	fmt.Println("Configuration saved successfully!")
+}
+
 func init() {
 	rootCmd.AddCommand(configCmd)
 
@@ -538,6 +599,8 @@ func init() {
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")
 	configCmd.Flags().String("set-hotkey", "", "Configure activation hotkey")
+	configCmd.Flags().String("set-openai-api-key", "", "Set OpenAI API key for cloud transcription")
+	configCmd.Flags().String("set-openai-model", "", "Set OpenAI model (e.g., gpt-4o-transcribe, whisper-1)")
 
 	// Add flags for preference management
 	configCmd.Flags().Bool("show-preferences", false, "Show current preferred microphones list")

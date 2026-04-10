@@ -42,11 +42,17 @@ type Config struct {
 	// AudioFeedback determines whether to play sounds on state changes
 	AudioFeedback bool `yaml:"audio_feedback"`
 
-	// Backend selects the transcription engine ("whisper" or "moonshine")
+	// Backend selects the transcription engine ("whisper", "moonshine", or "openai")
 	Backend string `yaml:"backend"`
 
 	// MoonshineModel is the Moonshine model to use (tiny, base)
 	MoonshineModel string `yaml:"moonshine_model,omitempty"`
+
+	// OpenAIAPIKey is the API key for OpenAI cloud transcription
+	OpenAIAPIKey string `yaml:"openai_api_key,omitempty"`
+
+	// OpenAIModel is the OpenAI model to use for transcription (e.g., "gpt-4o-transcribe", "whisper-1")
+	OpenAIModel string `yaml:"openai_model,omitempty"`
 
 	// Verbose enables detailed debug output
 	Verbose bool `yaml:"verbose"`
@@ -224,9 +230,15 @@ func (c *Config) Validate() error {
 		"":          true,
 		"whisper":   true,
 		"moonshine": true,
+		"openai":    true,
 	}
 	if !validBackends[c.Backend] {
-		return fmt.Errorf("invalid backend: %s (must be one of: whisper, moonshine)", c.Backend)
+		return fmt.Errorf("invalid backend: %s (must be one of: whisper, moonshine, openai)", c.Backend)
+	}
+
+	// Validate OpenAI backend requirements
+	if c.Backend == "openai" && c.OpenAIAPIKey == "" {
+		return fmt.Errorf("openai backend requires openai_api_key to be set. Use: openscribe config --set-openai-api-key <key>")
 	}
 
 	// Validate model (only enforce whisper model names when backend is whisper)
@@ -384,10 +396,24 @@ func (c *Config) String() string {
 		moonshineDisplay = fmt.Sprintf("\n  Moonshine Model: %s", mm)
 	}
 
+	// Show OpenAI settings if relevant
+	var openaiDisplay string
+	if c.Backend == "openai" {
+		om := c.OpenAIModel
+		if om == "" {
+			om = "gpt-4o-transcribe"
+		}
+		keyDisplay := "(not set)"
+		if c.OpenAIAPIKey != "" {
+			keyDisplay = c.OpenAIAPIKey[:7] + "..." + c.OpenAIAPIKey[len(c.OpenAIAPIKey)-4:]
+		}
+		openaiDisplay = fmt.Sprintf("\n  OpenAI Model:    %s\n  OpenAI API Key:  %s", om, keyDisplay)
+	}
+
 	return fmt.Sprintf(`Current Configuration:
 
 Settings:
-  Backend:         %s%s
+  Backend:         %s%s%s
   Microphone:      %s (legacy)
   Preferred Mics:  %s
   Model:           %s
@@ -411,6 +437,7 @@ Paths:
 `,
 		backend,
 		moonshineDisplay,
+		openaiDisplay,
 		microphone,
 		preferredMics,
 		c.Model,
