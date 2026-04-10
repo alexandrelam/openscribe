@@ -141,8 +141,11 @@ func (r *Recorder) Stop() ([]byte, error) {
 		return nil, fmt.Errorf("not currently recording")
 	}
 
-	// Stop the device
+	// Stop the device gracefully (flushes pending audio buffers)
 	if r.device != nil {
+		r.device.Stop()
+		// Brief delay to allow final audio callbacks to complete
+		time.Sleep(100 * time.Millisecond)
 		r.device.Uninit()
 	}
 
