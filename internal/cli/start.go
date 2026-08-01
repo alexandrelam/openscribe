@@ -204,7 +204,7 @@ func runStart(cmd *cobra.Command) {
 	case "openai":
 		om := cfg.OpenAIModel
 		if om == "" {
-			om = "gpt-4o-transcribe"
+			om = "gpt-transcribe"
 		}
 		fmt.Printf("  Model:           %s (openai)\n", om)
 	default:

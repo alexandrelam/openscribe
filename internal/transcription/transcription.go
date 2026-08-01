@@ -56,7 +56,7 @@ func New(cfg *config.Config) (Transcriber, error) {
 	case "moonshine":
 		return newMoonshineTranscriber(cfg)
 	case "openai":
-		return NewOpenAITranscriber(cfg.OpenAIAPIKey, cfg.OpenAIModel)
+		return NewOpenAITranscriber(cfg.OpenAIAPIKey, cfg.OpenAIModel, cfg.OpenAIPrompt, cfg.OpenAIKeywords)
 	default:
 		return nil, fmt.Errorf("unknown transcription backend: %s", cfg.Backend)
 	}

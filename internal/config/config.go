@@ -51,8 +51,14 @@ type Config struct {
 	// OpenAIAPIKey is the API key for OpenAI cloud transcription
 	OpenAIAPIKey string `yaml:"openai_api_key,omitempty"`
 
-	// OpenAIModel is the OpenAI model to use for transcription (e.g., "gpt-4o-transcribe", "whisper-1")
+	// OpenAIModel is the OpenAI model to use for transcription (e.g., "gpt-transcribe", "whisper-1")
 	OpenAIModel string `yaml:"openai_model,omitempty"`
+
+	// OpenAIPrompt is free-form context describing the recording's topic or setting
+	OpenAIPrompt string `yaml:"openai_prompt,omitempty"`
+
+	// OpenAIKeywords are literal terms expected in the audio, passed as hints to newer models
+	OpenAIKeywords []string `yaml:"openai_keywords,omitempty"`
 
 	// Verbose enables detailed debug output
 	Verbose bool `yaml:"verbose"`
@@ -401,13 +407,19 @@ func (c *Config) String() string {
 	if c.Backend == "openai" {
 		om := c.OpenAIModel
 		if om == "" {
-			om = "gpt-4o-transcribe"
+			om = "gpt-transcribe"
 		}
 		keyDisplay := "(not set)"
 		if c.OpenAIAPIKey != "" {
 			keyDisplay = c.OpenAIAPIKey[:7] + "..." + c.OpenAIAPIKey[len(c.OpenAIAPIKey)-4:]
 		}
 		openaiDisplay = fmt.Sprintf("\n  OpenAI Model:    %s\n  OpenAI API Key:  %s", om, keyDisplay)
+		if c.OpenAIPrompt != "" {
+			openaiDisplay += fmt.Sprintf("\n  OpenAI Prompt:   %s", c.OpenAIPrompt)
+		}
+		if len(c.OpenAIKeywords) > 0 {
+			openaiDisplay += fmt.Sprintf("\n  OpenAI Keywords: %s", strings.Join(c.OpenAIKeywords, ", "))
+		}
 	}
 
 	return fmt.Sprintf(`Current Configuration:

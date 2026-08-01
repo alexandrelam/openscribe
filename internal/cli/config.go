@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
@@ -121,6 +122,18 @@ var configCmd = &cobra.Command{
 		if cmd.Flags().Changed("set-openai-model") {
 			value, _ := cmd.Flags().GetString("set-openai-model")
 			handleSetOpenAIModel(value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-openai-prompt") {
+			value, _ := cmd.Flags().GetString("set-openai-prompt")
+			handleSetOpenAIPrompt(value)
+			return
+		}
+
+		if cmd.Flags().Changed("set-openai-keywords") {
+			value, _ := cmd.Flags().GetString("set-openai-keywords")
+			handleSetOpenAIKeywords(value)
 			return
 		}
 
@@ -576,9 +589,59 @@ func handleSetOpenAIModel(model string) {
 	}
 
 	if model == "" {
-		fmt.Println("OpenAI model reset to default (gpt-4o-transcribe).")
+		fmt.Println("OpenAI model reset to default (gpt-transcribe).")
 	} else {
 		fmt.Printf("OpenAI model set to: %s\n", model)
+	}
+	fmt.Println("Configuration saved successfully!")
+}
+
+func handleSetOpenAIPrompt(prompt string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.OpenAIPrompt = prompt
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if prompt == "" {
+		fmt.Println("OpenAI prompt cleared.")
+	} else {
+		fmt.Printf("OpenAI prompt set to: %s\n", prompt)
+	}
+	fmt.Println("Configuration saved successfully!")
+}
+
+func handleSetOpenAIKeywords(value string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	var keywords []string
+	for _, kw := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(kw); trimmed != "" {
+			keywords = append(keywords, trimmed)
+		}
+	}
+	cfg.OpenAIKeywords = keywords
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(keywords) == 0 {
+		fmt.Println("OpenAI keywords cleared.")
+	} else {
+		fmt.Printf("OpenAI keywords set to: %s\n", strings.Join(keywords, ", "))
 	}
 	fmt.Println("Configuration saved successfully!")
 }
@@ -600,7 +663,9 @@ func init() {
 	configCmd.Flags().String("set-language", "", "Set default language")
 	configCmd.Flags().String("set-hotkey", "", "Configure activation hotkey")
 	configCmd.Flags().String("set-openai-api-key", "", "Set OpenAI API key for cloud transcription")
-	configCmd.Flags().String("set-openai-model", "", "Set OpenAI model (e.g., gpt-4o-transcribe, whisper-1)")
+	configCmd.Flags().String("set-openai-model", "", "Set OpenAI model (e.g., gpt-transcribe, whisper-1)")
+	configCmd.Flags().String("set-openai-prompt", "", "Set OpenAI prompt describing the recording's topic/context")
+	configCmd.Flags().String("set-openai-keywords", "", "Set OpenAI keyword hints (comma-separated literal terms)")
 
 	// Add flags for preference management
 	configCmd.Flags().Bool("show-preferences", false, "Show current preferred microphones list")

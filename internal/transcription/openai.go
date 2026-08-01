@@ -9,31 +9,58 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// DefaultOpenAIModel is the default OpenAI transcription model.
+const DefaultOpenAIModel = "gpt-transcribe"
 
 // OpenAITranscriber handles speech-to-text transcription using the OpenAI API.
 type OpenAITranscriber struct {
-	apiKey string
-	model  string
+	apiKey   string
+	model    string
+	prompt   string
+	keywords []string
 }
 
 // openAIResponse represents the JSON response from the OpenAI transcription API.
 type openAIResponse struct {
-	Text string `json:"text"`
+	Text      string `json:"text"`
+	Languages []struct {
+		Code string `json:"code"`
+	} `json:"languages"`
 }
 
 // NewOpenAITranscriber creates a new OpenAI-based transcriber.
-func NewOpenAITranscriber(apiKey, model string) (*OpenAITranscriber, error) {
+func NewOpenAITranscriber(apiKey, model, prompt string, keywords []string) (*OpenAITranscriber, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("OpenAI API key is required")
 	}
 	if model == "" {
-		model = "gpt-4o-transcribe"
+		model = DefaultOpenAIModel
+	}
+	if err := validateKeywords(keywords); err != nil {
+		return nil, err
 	}
 	return &OpenAITranscriber{
-		apiKey: apiKey,
-		model:  model,
+		apiKey:   apiKey,
+		model:    model,
+		prompt:   prompt,
+		keywords: keywords,
 	}, nil
+}
+
+func usesNewModelFields(model string) bool {
+	return strings.HasPrefix(model, "gpt-transcribe") || strings.HasPrefix(model, "gpt-live-transcribe")
+}
+
+func validateKeywords(keywords []string) error {
+	for _, kw := range keywords {
+		if strings.ContainsAny(kw, "<>\r\n") {
+			return fmt.Errorf("invalid keyword %q: must be a single line and must not contain '<', '>', or line breaks", kw)
+		}
+	}
+	return nil
 }
 
 // TranscribeFile transcribes an audio file using the OpenAI API and returns the text.
@@ -63,10 +90,31 @@ func (t *OpenAITranscriber) TranscribeFile(audioPath string, opts Options) (*Res
 		return nil, fmt.Errorf("failed to write model field: %w", err)
 	}
 
-	// Add language if specified
+	newModel := usesNewModelFields(t.model)
+
 	if opts.Language != "" {
-		if err := writer.WriteField("language", opts.Language); err != nil {
-			return nil, fmt.Errorf("failed to write language field: %w", err)
+		if newModel {
+			if err := writer.WriteField("languages[]", opts.Language); err != nil {
+				return nil, fmt.Errorf("failed to write languages field: %w", err)
+			}
+		} else {
+			if err := writer.WriteField("language", opts.Language); err != nil {
+				return nil, fmt.Errorf("failed to write language field: %w", err)
+			}
+		}
+	}
+
+	if t.prompt != "" {
+		if err := writer.WriteField("prompt", t.prompt); err != nil {
+			return nil, fmt.Errorf("failed to write prompt field: %w", err)
+		}
+	}
+
+	if newModel {
+		for _, kw := range t.keywords {
+			if err := writer.WriteField("keywords[]", kw); err != nil {
+				return nil, fmt.Errorf("failed to write keywords field: %w", err)
+			}
 		}
 	}
 
@@ -114,8 +162,13 @@ func (t *OpenAITranscriber) TranscribeFile(audioPath string, opts Options) (*Res
 		return nil, fmt.Errorf("transcription produced empty result")
 	}
 
+	language := opts.Language
+	if len(apiResp.Languages) > 0 && apiResp.Languages[0].Code != "" {
+		language = apiResp.Languages[0].Code
+	}
+
 	return &Result{
 		Text:     apiResp.Text,
-		Language: opts.Language,
+		Language: language,
 	}, nil
 }
