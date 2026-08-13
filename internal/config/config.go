@@ -42,6 +42,13 @@ type Config struct {
 	// AudioFeedback determines whether to play sounds on state changes
 	AudioFeedback bool `yaml:"audio_feedback"`
 
+	// MuteDuringRecording mutes the system's audio output while recording, so
+	// playing audio does not bleed into the microphone, and restores it on stop.
+	// A pointer is used so an absent key in a config written before this option
+	// existed is distinguishable from an explicit false; nil means enabled.
+	// Use MuteDuringRecordingEnabled() to read it.
+	MuteDuringRecording *bool `yaml:"mute_during_recording,omitempty"`
+
 	// Backend selects the transcription engine ("whisper", "moonshine", or "openai")
 	Backend string `yaml:"backend"`
 
@@ -84,6 +91,20 @@ type Config struct {
 	ShowAudioLevels bool `yaml:"show_audio_levels"`
 }
 
+// boolPtr returns a pointer to the given bool, for optional config fields
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+// MuteDuringRecordingEnabled reports whether system audio should be muted while
+// recording. The feature is on by default, so an unset value means enabled.
+func (c *Config) MuteDuringRecordingEnabled() bool {
+	if c.MuteDuringRecording == nil {
+		return true
+	}
+	return *c.MuteDuringRecording
+}
+
 // DefaultConfig returns a Config with default values
 func DefaultConfig() *Config {
 	return &Config{
@@ -95,6 +116,7 @@ func DefaultConfig() *Config {
 		Triggers:             []string{"Right Option"},
 		AutoPaste:            true,
 		AudioFeedback:        true,
+		MuteDuringRecording:  boolPtr(true),
 		Backend:              "whisper",
 		MoonshineModel:       "",
 		Verbose:              false,
@@ -432,6 +454,7 @@ Settings:
   Language:        %s
   Triggers:        %s%s  Auto-paste:      %t
   Audio Feedback:  %t
+  Mute While Rec:  %t
   Verbose:         %t
 
 Audio Gain Control:
@@ -458,6 +481,7 @@ Paths:
 		hotkeyDisplay,
 		c.AutoPaste,
 		c.AudioFeedback,
+		c.MuteDuringRecordingEnabled(),
 		c.Verbose,
 		c.AutoGain,
 		c.TargetLevelDB,

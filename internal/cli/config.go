@@ -33,6 +33,8 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-openai-model") &&
 			!cmd.Flags().Changed("enable-audio-feedback") &&
 			!cmd.Flags().Changed("disable-audio-feedback") &&
+			!cmd.Flags().Changed("enable-mute-during-recording") &&
+			!cmd.Flags().Changed("disable-mute-during-recording") &&
 			!cmd.Flags().Changed("show-preferences") &&
 			!cmd.Flags().Changed("add-preference") &&
 			!cmd.Flags().Changed("remove-preference") &&
@@ -85,6 +87,17 @@ var configCmd = &cobra.Command{
 
 		if cmd.Flags().Changed("disable-audio-feedback") {
 			handleSetAudioFeedback(false)
+			return
+		}
+
+		// Handle mute-during-recording enable/disable
+		if cmd.Flags().Changed("enable-mute-during-recording") {
+			handleSetMuteDuringRecording(true)
+			return
+		}
+
+		if cmd.Flags().Changed("disable-mute-during-recording") {
+			handleSetMuteDuringRecording(false)
 			return
 		}
 
@@ -384,6 +397,28 @@ func handleSetAudioFeedback(enabled bool) {
 	fmt.Println("Configuration saved successfully!")
 }
 
+func handleSetMuteDuringRecording(enabled bool) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.MuteDuringRecording = &enabled
+
+	if err := cfg.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	if enabled {
+		fmt.Println("System audio will be muted while recording.")
+	} else {
+		fmt.Println("System audio will keep playing while recording.")
+	}
+	fmt.Println("Configuration saved successfully!")
+}
+
 func handleShowPreferences() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -658,6 +693,8 @@ func init() {
 	configCmd.Flags().Bool("test-sounds", false, "Test audio feedback sounds")
 	configCmd.Flags().Bool("enable-audio-feedback", false, "Enable audio feedback")
 	configCmd.Flags().Bool("disable-audio-feedback", false, "Disable audio feedback")
+	configCmd.Flags().Bool("enable-mute-during-recording", false, "Mute system audio output while recording")
+	configCmd.Flags().Bool("disable-mute-during-recording", false, "Keep system audio output playing while recording")
 	configCmd.Flags().String("set-microphone", "", "Set default microphone")
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")

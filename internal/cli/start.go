@@ -214,6 +214,7 @@ func runStart(cmd *cobra.Command) {
 	fmt.Printf("  Triggers:        %s (double-press)\n", triggersDisplay)
 	fmt.Printf("  Auto-paste:      %t\n", cfg.AutoPaste)
 	fmt.Printf("  Audio Feedback:  %t\n", cfg.AudioFeedback)
+	fmt.Printf("  Mute While Rec:  %t\n", cfg.MuteDuringRecordingEnabled())
 	fmt.Println()
 
 	// Initialize audio feedback if enabled
@@ -228,6 +229,25 @@ func runStart(cmd *cobra.Command) {
 			defer func() {
 				if err := feedback.Close(); err != nil && cfg.Verbose {
 					fmt.Fprintf(os.Stderr, "Warning: Failed to close audio feedback: %v\n", err)
+				}
+			}()
+		}
+	}
+
+	// Initialize system output muting if enabled
+	var muter audio.OutputMuter
+	if cfg.MuteDuringRecordingEnabled() {
+		var err error
+		muter, err = audio.NewOutputMuter()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to initialize output muting: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Continuing without muting system audio...\n\n")
+			muter = nil
+		} else {
+			// Always restore the volume on the way out, including on Ctrl+C
+			defer func() {
+				if err := muter.Close(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to restore system volume: %v\n", err)
 				}
 			}()
 		}
@@ -314,6 +334,14 @@ func runStart(cmd *cobra.Command) {
 				return
 			}
 
+			// Mute system audio so playback doesn't bleed into the microphone.
+			// Done after the start sound so that sound is still audible.
+			if muter != nil {
+				if err := muter.Mute(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to mute system audio: %v\n", err)
+				}
+			}
+
 			// Set up warning timer (4 minutes)
 			warningTimer = time.AfterFunc(RecordingTimeoutWarning, func() {
 				fmt.Printf("\n⚠️  Warning: Recording has been running for %.0f minutes\n", RecordingTimeoutWarning.Minutes())
@@ -338,6 +366,13 @@ func runStart(cmd *cobra.Command) {
 				currentRecorder := recorder
 
 				mu.Unlock()
+
+				// Restore system audio before the stop sound, so it is audible
+				if muter != nil {
+					if err := muter.Restore(); err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to restore system volume: %v\n", err)
+					}
+				}
 
 				// Play stop sound
 				if feedback != nil {
@@ -525,6 +560,13 @@ func runStart(cmd *cobra.Command) {
 			}
 
 			fmt.Println("⏹  Recording stopped. Transcribing...")
+
+			// Restore system audio before the stop sound, so it is audible
+			if muter != nil {
+				if err := muter.Restore(); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to restore system volume: %v\n", err)
+				}
+			}
 
 			// Play stop sound
 			if feedback != nil {

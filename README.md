@@ -412,6 +412,21 @@ openscribe config --list-sounds
 openscribe config --test-sounds
 ```
 
+### Muting While Recording
+
+By default, OpenScribe mutes your Mac's audio output while a recording is in
+progress, so music or a video call doesn't bleed into the microphone. The output
+is restored to its exact previous level as soon as recording stops — before
+transcription starts — and also on shutdown, so your volume is never left muted.
+
+```bash
+# Mute system audio while recording (default)
+openscribe config --enable-mute-during-recording
+
+# Keep system audio playing while recording
+openscribe config --disable-mute-during-recording
+```
+
 ### Configuration File
 
 All settings are stored in:
@@ -434,6 +449,7 @@ triggers:                             # New - supports multiple triggers
   - "Right Option"                    # Keyboard trigger
   - "Forward Button"                  # Mouse button trigger
 audio_feedback: true
+mute_during_recording: true           # Mute the Mac's output while recording
 start_sound: "Tink"
 stop_sound: "Pop"
 complete_sound: "Glass"
@@ -482,6 +498,8 @@ complete_sound: "Glass"
 | `--list-hotkeys` | List available hotkeys |
 | `--enable-audio-feedback` | Enable audio feedback |
 | `--disable-audio-feedback` | Disable audio feedback |
+| `--enable-mute-during-recording` | Mute system audio output while recording |
+| `--disable-mute-during-recording` | Keep system audio output playing while recording |
 | `--list-sounds` | List available system sounds |
 | `--test-sounds` | Test audio feedback sounds |
 
