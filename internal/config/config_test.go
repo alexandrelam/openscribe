@@ -19,6 +19,7 @@ func TestDefaultConfig(t *testing.T) {
 		{"Language", cfg.Language, ""},
 		{"AutoPaste", cfg.AutoPaste, true},
 		{"AudioFeedback", cfg.AudioFeedback, true},
+		{"MuteDuringRecording", cfg.MuteDuringRecordingEnabled(), true},
 		{"Verbose", cfg.Verbose, false},
 		{"AutoGain", cfg.AutoGain, true},
 		{"TargetLevelDB", cfg.TargetLevelDB, -18.0},
@@ -732,16 +733,16 @@ func TestLoad_WithGainControlSettings(t *testing.T) {
 
 	// Create config with custom gain control settings
 	original := &Config{
-		Model:            "small",
-		Triggers:         []string{"Right Option"},
-		AutoPaste:        true,
-		AudioFeedback:    true,
-		Verbose:          false,
-		AutoGain:         false,
-		TargetLevelDB:    -15.0,
-		MinThresholdDB:   -35.0,
-		MaxGainDB:        15.0,
-		ShowAudioLevels:  true,
+		Model:           "small",
+		Triggers:        []string{"Right Option"},
+		AutoPaste:       true,
+		AudioFeedback:   true,
+		Verbose:         false,
+		AutoGain:        false,
+		TargetLevelDB:   -15.0,
+		MinThresholdDB:  -35.0,
+		MaxGainDB:       15.0,
+		ShowAudioLevels: true,
 	}
 
 	// Save it
@@ -793,5 +794,104 @@ func TestString_WithGainControl(t *testing.T) {
 	}
 	if !strings.Contains(output, "-18.0 dBFS") {
 		t.Error("String() should contain default target level '-18.0 dBFS'")
+	}
+}
+
+func TestMuteDuringRecordingEnabled(t *testing.T) {
+	enabled := true
+	disabled := false
+
+	tests := []struct {
+		name  string
+		value *bool
+		want  bool
+	}{
+		{"unset defaults to enabled", nil, true},
+		{"explicitly enabled", &enabled, true},
+		{"explicitly disabled", &disabled, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{MuteDuringRecording: tt.value}
+			if got := cfg.MuteDuringRecordingEnabled(); got != tt.want {
+				t.Errorf("MuteDuringRecordingEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_MuteDuringRecording(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{
+			// Configs written before this option existed have no such key and
+			// must keep the feature on after an upgrade
+			name: "missing key defaults to enabled",
+			yaml: "model: small\ntriggers:\n  - Right Option\nauto_paste: true\naudio_feedback: true\n",
+			want: true,
+		},
+		{
+			name: "explicit false is honored",
+			yaml: "model: small\ntriggers:\n  - Right Option\nmute_during_recording: false\n",
+			want: false,
+		},
+		{
+			name: "explicit true is honored",
+			yaml: "model: small\ntriggers:\n  - Right Option\nmute_during_recording: true\n",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempHome := t.TempDir()
+			t.Setenv("HOME", tempHome)
+
+			configPath, err := GetConfigPath()
+			if err != nil {
+				t.Fatalf("GetConfigPath() error = %v", err)
+			}
+			if err := EnsureDirectories(); err != nil {
+				t.Fatalf("EnsureDirectories() error = %v", err)
+			}
+			if err := os.WriteFile(configPath, []byte(tt.yaml), 0644); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			if got := cfg.MuteDuringRecordingEnabled(); got != tt.want {
+				t.Errorf("MuteDuringRecordingEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSave_PreservesDisabledMuteDuringRecording(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	disabled := false
+	original := DefaultConfig()
+	original.MuteDuringRecording = &disabled
+
+	if err := original.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if loaded.MuteDuringRecordingEnabled() {
+		t.Error("MuteDuringRecordingEnabled() = true after saving an explicit false, want false")
 	}
 }
