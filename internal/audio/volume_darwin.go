@@ -305,6 +305,10 @@ const (
 	methodVolume  = 3
 )
 
+// Compile-time check that the macOS muter satisfies the interface. Without it
+// a missing method only shows up at the call site in newPlatformOutputMuter.
+var _ OutputMuter = (*darwinOutputMuter)(nil)
+
 // darwinOutputMuter mutes the default output device using CoreAudio, falling
 // back to AppleScript for devices CoreAudio exposes no writable control for.
 type darwinOutputMuter struct {
@@ -456,4 +460,9 @@ func (m *darwinOutputMuter) Describe() string {
 		return fmt.Sprintf("unknown output device (%v)", err)
 	}
 	return name
+}
+
+// Close restores the device if still muted and releases resources
+func (m *darwinOutputMuter) Close() error {
+	return m.Restore()
 }
