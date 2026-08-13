@@ -18,6 +18,13 @@ type OutputMuter interface {
 	// IsMuted reports whether this instance currently holds a mute.
 	IsMuted() bool
 
+	// Method names the mechanism currently holding the mute (for diagnostics),
+	// and is empty when nothing is muted.
+	Method() string
+
+	// Describe names the audio output device that would be muted.
+	Describe() string
+
 	// Close releases any resources, restoring the device first if needed.
 	Close() error
 }

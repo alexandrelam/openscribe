@@ -14,6 +14,12 @@ func TestNewOutputMuter(t *testing.T) {
 	if muter.IsMuted() {
 		t.Error("expected a freshly created muter to report IsMuted() = false")
 	}
+	if muter.Method() != "" {
+		t.Errorf("expected Method() = \"\" before muting, got %q", muter.Method())
+	}
+	if muter.Describe() == "" {
+		t.Error("expected Describe() to return a non-empty description")
+	}
 }
 
 // TestRestoreWithoutMute verifies Restore is a safe no-op when nothing was

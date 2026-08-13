@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexandrelam/openscribe/internal/audio"
 	"github.com/alexandrelam/openscribe/internal/config"
@@ -33,6 +34,7 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-openai-model") &&
 			!cmd.Flags().Changed("enable-audio-feedback") &&
 			!cmd.Flags().Changed("disable-audio-feedback") &&
+			!cmd.Flags().Changed("test-mute") &&
 			!cmd.Flags().Changed("enable-mute-during-recording") &&
 			!cmd.Flags().Changed("disable-mute-during-recording") &&
 			!cmd.Flags().Changed("show-preferences") &&
@@ -87,6 +89,12 @@ var configCmd = &cobra.Command{
 
 		if cmd.Flags().Changed("disable-audio-feedback") {
 			handleSetAudioFeedback(false)
+			return
+		}
+
+		// Handle --test-mute flag
+		if cmd.Flags().Changed("test-mute") {
+			handleTestMute()
 			return
 		}
 
@@ -397,6 +405,40 @@ func handleSetAudioFeedback(enabled bool) {
 	fmt.Println("Configuration saved successfully!")
 }
 
+func handleTestMute() {
+	muter, err := audio.NewOutputMuter()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing output muting: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := muter.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to restore system volume: %v\n", err)
+		}
+	}()
+
+	fmt.Printf("Output device: %s\n", muter.Describe())
+	fmt.Println("Muting system audio for 2 seconds...")
+
+	if err := muter.Mute(); err != nil {
+		fmt.Fprintf(os.Stderr, "\nError: Failed to mute system audio: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nOpenScribe cannot silence this output device. Recording still\n")
+		fmt.Fprintf(os.Stderr, "works; disable this feature with:\n")
+		fmt.Fprintf(os.Stderr, "  openscribe config --disable-mute-during-recording\n")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Muted using: %s\n", muter.Method())
+	time.Sleep(2 * time.Second)
+
+	if err := muter.Restore(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to restore system volume: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Volume restored. Mute test complete!")
+}
+
 func handleSetMuteDuringRecording(enabled bool) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -693,6 +735,7 @@ func init() {
 	configCmd.Flags().Bool("test-sounds", false, "Test audio feedback sounds")
 	configCmd.Flags().Bool("enable-audio-feedback", false, "Enable audio feedback")
 	configCmd.Flags().Bool("disable-audio-feedback", false, "Disable audio feedback")
+	configCmd.Flags().Bool("test-mute", false, "Mute system audio for 2 seconds to test the mute mechanism")
 	configCmd.Flags().Bool("enable-mute-during-recording", false, "Mute system audio output while recording")
 	configCmd.Flags().Bool("disable-mute-during-recording", false, "Keep system audio output playing while recording")
 	configCmd.Flags().String("set-microphone", "", "Set default microphone")

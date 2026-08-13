@@ -425,7 +425,16 @@ openscribe config --enable-mute-during-recording
 
 # Keep system audio playing while recording
 openscribe config --disable-mute-during-recording
+
+# Check that muting works with your current output device
+openscribe config --test-mute
 ```
+
+OpenScribe silences output through the first mechanism your device supports:
+its own mute switch, the system volume the volume keys drive, or the device's
+volume level — falling back to AppleScript for outputs that expose none of
+those. If your device supports nothing at all, `--test-mute` will say so, and
+recording still works normally.
 
 ### Configuration File
 
@@ -498,6 +507,7 @@ complete_sound: "Glass"
 | `--list-hotkeys` | List available hotkeys |
 | `--enable-audio-feedback` | Enable audio feedback |
 | `--disable-audio-feedback` | Disable audio feedback |
+| `--test-mute` | Mute system audio for 2 seconds to test the mute mechanism |
 | `--enable-mute-during-recording` | Mute system audio output while recording |
 | `--disable-mute-during-recording` | Keep system audio output playing while recording |
 | `--list-sounds` | List available system sounds |

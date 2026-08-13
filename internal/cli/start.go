@@ -295,6 +295,7 @@ func runStart(cmd *cobra.Command) {
 		recordStart      time.Time
 		timeoutTimer     *time.Timer
 		warningTimer     *time.Timer
+		muteWarningShown bool       // only nag about the disable flag once
 		transcribingLock sync.Mutex // Separate lock for transcription state
 	)
 
@@ -339,6 +340,12 @@ func runStart(cmd *cobra.Command) {
 			if muter != nil {
 				if err := muter.Mute(); err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: Failed to mute system audio: %v\n", err)
+					if !muteWarningShown {
+						fmt.Fprintf(os.Stderr, "   Turn this off with: openscribe config --disable-mute-during-recording\n")
+						muteWarningShown = true
+					}
+				} else if cfg.Verbose {
+					fmt.Printf("   Muted system audio using: %s\n", muter.Method())
 				}
 			}
 
