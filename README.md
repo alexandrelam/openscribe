@@ -433,8 +433,14 @@ openscribe config --test-mute
 OpenScribe silences output through the first mechanism your device supports:
 its own mute switch, the system volume the volume keys drive, or the device's
 volume level — falling back to AppleScript for outputs that expose none of
-those. If your device supports nothing at all, `--test-mute` will say so, and
-recording still works normally.
+those.
+
+Some outputs cannot be turned down by macOS at all, because their volume lives
+in the hardware — an HDMI or DisplayPort monitor with its own speakers is the
+usual case. For those, OpenScribe presses the play/pause media key instead,
+pausing whatever is playing and resuming it when recording stops. It only does
+this when audio is actually playing, so it never starts a paused player. Run
+`--test-mute` to see which mechanism applies to your current device.
 
 ### Configuration File
 

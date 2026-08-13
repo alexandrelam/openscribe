@@ -5,10 +5,16 @@ package audio
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework CoreAudio -framework CoreFoundation
+#cgo LDFLAGS: -framework CoreAudio -framework CoreFoundation -framework AppKit -framework CoreGraphics
 
 #import <CoreAudio/CoreAudio.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
+
+// Media key code for play/pause, from IOKit's ev_keymap.h. Declared here so the
+// file does not need the IOKit headers for a single constant.
+#define OS_KEYTYPE_PLAY 16
 
 // The "main" element of a property is element 0. Spelling it out avoids having
 // to pick between kAudioObjectPropertyElementMain (macOS 12+) and the
@@ -94,6 +100,102 @@ static int openscribeOutputDeviceName(char *buf, int bufLen) {
     Boolean ok = CFStringGetCString(name, buf, bufLen, kCFStringEncodingUTF8);
     CFRelease(name);
     return ok ? OS_MUTE_OK : OS_MUTE_READ_FAILED;
+}
+
+// Return the current default output device's ID, or kAudioObjectUnknown.
+// Used to notice when the user switches outputs.
+static AudioDeviceID openscribeDefaultOutputDeviceID(void) {
+    AudioDeviceID dev = kAudioObjectUnknown;
+    if (defaultOutputDevice(&dev) != noErr) {
+        return kAudioObjectUnknown;
+    }
+    return dev;
+}
+
+// Report whether the default output device exposes any writable control.
+// Read-only: it changes nothing. Returns 1 when something is settable.
+static int openscribeCanControlOutput(void) {
+    AudioDeviceID dev = kAudioObjectUnknown;
+    if (defaultOutputDevice(&dev) != noErr || dev == kAudioObjectUnknown) {
+        return 0;
+    }
+
+    AudioObjectPropertyAddress addr = {
+        kAudioDevicePropertyMute,
+        kAudioDevicePropertyScopeOutput,
+        OS_ELEMENT_MAIN
+    };
+    if (propertySettable(dev, &addr)) {
+        return 1;
+    }
+
+    addr.mSelector = OS_VIRTUAL_MAIN_VOLUME;
+    if (propertySettable(dev, &addr)) {
+        return 1;
+    }
+
+    addr.mSelector = kAudioDevicePropertyVolumeScalar;
+    if (propertySettable(dev, &addr)) {
+        return 1;
+    }
+
+    for (UInt32 channel = 1; channel <= OS_MAX_VOLUME_CHANNELS; channel++) {
+        addr.mElement = channel;
+        if (propertySettable(dev, &addr)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// Report whether any process is currently playing through the default output
+// device. This gates the media-key fallback: play/pause is a toggle, so
+// pressing it when nothing is playing would *start* playback.
+static int openscribeOutputIsPlaying(void) {
+    AudioDeviceID dev = kAudioObjectUnknown;
+    if (defaultOutputDevice(&dev) != noErr || dev == kAudioObjectUnknown) {
+        return 0;
+    }
+
+    AudioObjectPropertyAddress addr = {
+        kAudioDevicePropertyDeviceIsRunningSomewhere,
+        kAudioObjectPropertyScopeGlobal,
+        OS_ELEMENT_MAIN
+    };
+
+    UInt32 running = 0;
+    UInt32 size = sizeof(running);
+    if (AudioObjectGetPropertyData(dev, &addr, 0, NULL, &size, &running) != noErr) {
+        return 0;
+    }
+    return running ? 1 : 0;
+}
+
+// Press the play/pause media key, exactly as the keyboard key does, so any
+// player that responds to it (Music, Spotify, browsers) pauses or resumes.
+// Posting to the HID tap needs the accessibility permission OpenScribe already
+// requires for its triggers and for auto-paste.
+static void openscribeSendPlayPause(void) {
+    @autoreleasepool {
+        // 0xa marks a key-down, 0xb a key-up; both are required for a press.
+        int phases[2] = {0xa, 0xb};
+        for (int i = 0; i < 2; i++) {
+            NSEvent *event = [NSEvent otherEventWithType:NSEventTypeSystemDefined
+                                                location:NSZeroPoint
+                                           modifierFlags:(phases[i] << 8)
+                                               timestamp:0
+                                            windowNumber:0
+                                                 context:nil
+                                                 subtype:8
+                                                   data1:((OS_KEYTYPE_PLAY << 16) | (phases[i] << 8))
+                                                   data2:-1];
+            CGEventRef cgEvent = [event CGEvent];
+            if (cgEvent != NULL) {
+                CGEventPost(kCGHIDEventTap, cgEvent);
+            }
+        }
+    }
 }
 
 // Mute the current default output device, recording its previous state.
@@ -309,14 +411,29 @@ const (
 // a missing method only shows up at the call site in newPlatformOutputMuter.
 var _ OutputMuter = (*darwinOutputMuter)(nil)
 
-// darwinOutputMuter mutes the default output device using CoreAudio, falling
-// back to AppleScript for devices CoreAudio exposes no writable control for.
+// darwinOutputMuter silences the default output device. It prefers CoreAudio,
+// then AppleScript, and finally — for outputs macOS cannot control at all, such
+// as a monitor whose volume lives in its own hardware — pauses playback with
+// the play/pause media key.
 type darwinOutputMuter struct {
 	mu       sync.Mutex
 	state    C.MuteState
 	muted    bool
 	fallback *appleScriptVolume
 	method   string
+
+	// pausedPlayback records that the media key was pressed to pause, so
+	// Restore presses it again to resume
+	pausedPlayback bool
+
+	// playbackRunning is sampled by Prepare, before any feedback sound can
+	// make the output device look busy
+	playbackRunning bool
+
+	// uncontrollable caches the device the volume paths were already found
+	// useless for, so each recording does not re-probe it or re-report it
+	uncontrollable    C.AudioDeviceID
+	hasUncontrollable bool
 }
 
 // newPlatformOutputMuter creates a new macOS output muter
@@ -375,6 +492,22 @@ func methodName(method int) string {
 	}
 }
 
+// Prepare samples state that a feedback sound would disturb. Call it before
+// playing anything, otherwise the start sound makes the output device look
+// busy and the media-key fallback pauses a player that was never playing.
+func (m *darwinOutputMuter) Prepare() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.playbackRunning = C.openscribeOutputIsPlaying() == 1
+}
+
+// SupportsVolumeControl reports whether macOS can change this output device's
+// level at all. Displays that keep volume in their own hardware cannot be
+// controlled, and only the media-key fallback is available for them.
+func (m *darwinOutputMuter) SupportsVolumeControl() bool {
+	return C.openscribeCanControlOutput() == 1
+}
+
 // Mute silences the current default output device, remembering its prior state
 func (m *darwinOutputMuter) Mute() error {
 	m.mu.Lock()
@@ -382,6 +515,16 @@ func (m *darwinOutputMuter) Mute() error {
 
 	if m.muted {
 		return nil
+	}
+
+	device := C.openscribeDefaultOutputDeviceID()
+
+	// Skip the volume paths entirely on a device already known to have none.
+	// Re-probing every recording would repeat the same work and the same
+	// failure; the cache is per device, so plugging in headphones re-enables
+	// proper muting straight away.
+	if m.hasUncontrollable && m.uncontrollable == device {
+		return m.pausePlayback()
 	}
 
 	code := C.openscribeMuteOutput(&m.state)
@@ -399,13 +542,37 @@ func (m *darwinOutputMuter) Mute() error {
 		return muteError(code, &m.state)
 	}
 
-	fallback, err := muteViaAppleScript()
-	if err != nil {
-		return fmt.Errorf("%v; AppleScript fallback also failed: %w", muteError(code, &m.state), err)
+	if fallback, err := muteViaAppleScript(); err == nil {
+		m.fallback = fallback
+		m.method = "AppleScript"
+		m.muted = true
+		return nil
 	}
 
-	m.fallback = fallback
-	m.method = "AppleScript"
+	// Nothing can change this device's level — its volume lives in the
+	// hardware. Remember that, and fall back to pausing whatever is playing.
+	m.uncontrollable = device
+	m.hasUncontrollable = true
+	return m.pausePlayback()
+}
+
+// pausePlayback presses the play/pause media key, but only when Prepare saw
+// something actually playing: the key is a toggle, so pressing it against
+// silence would start a player rather than stop one.
+//
+// Callers hold m.mu.
+func (m *darwinOutputMuter) pausePlayback() error {
+	if !m.playbackRunning {
+		// Nothing to silence. Not an error — there is no audio to bleed into
+		// the recording, which is the outcome we wanted anyway.
+		m.method = "nothing playing"
+		m.muted = true
+		return nil
+	}
+
+	C.openscribeSendPlayPause()
+	m.pausedPlayback = true
+	m.method = "paused playback"
 	m.muted = true
 	return nil
 }
@@ -425,6 +592,13 @@ func (m *darwinOutputMuter) Restore() error {
 	// is nothing left to restore, and retrying forever helps no one.
 	m.muted = false
 	m.method = ""
+
+	// Resume only what we actually paused
+	if m.pausedPlayback {
+		m.pausedPlayback = false
+		C.openscribeSendPlayPause()
+		return nil
+	}
 
 	if m.fallback != nil {
 		fallback := m.fallback

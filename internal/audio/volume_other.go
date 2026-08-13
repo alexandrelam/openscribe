@@ -14,6 +14,14 @@ func newPlatformOutputMuter() (OutputMuter, error) {
 	return &noopOutputMuter{}, nil
 }
 
+// Prepare does nothing on unsupported platforms
+func (m *noopOutputMuter) Prepare() {}
+
+// SupportsVolumeControl always reports false on unsupported platforms
+func (m *noopOutputMuter) SupportsVolumeControl() bool {
+	return false
+}
+
 // Mute does nothing on unsupported platforms
 func (m *noopOutputMuter) Mute() error {
 	return nil

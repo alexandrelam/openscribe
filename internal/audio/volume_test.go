@@ -20,6 +20,20 @@ func TestNewOutputMuter(t *testing.T) {
 	if muter.Describe() == "" {
 		t.Error("expected Describe() to return a non-empty description")
 	}
+
+	// Prepare samples playback state and must be safe to call repeatedly,
+	// including before anything has ever been muted
+	muter.Prepare()
+	muter.Prepare()
+	if muter.IsMuted() {
+		t.Error("expected Prepare() not to mute anything")
+	}
+
+	// SupportsVolumeControl is a read-only probe and must not change state
+	muter.SupportsVolumeControl()
+	if muter.IsMuted() {
+		t.Error("expected SupportsVolumeControl() not to mute anything")
+	}
 }
 
 // TestRestoreWithoutMute verifies Restore is a safe no-op when nothing was
