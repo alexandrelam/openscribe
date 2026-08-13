@@ -417,18 +417,31 @@ func handleTestMute() {
 		}
 	}()
 
-	fmt.Printf("Output device: %s\n", muter.Describe())
-	fmt.Println("Muting system audio for 2 seconds...")
+	fmt.Printf("Output device:  %s\n", muter.Describe())
+	if muter.SupportsVolumeControl() {
+		fmt.Println("Volume control: yes")
+	} else {
+		fmt.Println("Volume control: no (macOS cannot set this device's level)")
+		fmt.Println("                Playback will be paused instead of muted.")
+	}
+
+	muter.Prepare()
+	fmt.Println("\nSilencing system audio for 2 seconds...")
 
 	if err := muter.Mute(); err != nil {
-		fmt.Fprintf(os.Stderr, "\nError: Failed to mute system audio: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nError: Failed to silence system audio: %v\n", err)
 		fmt.Fprintf(os.Stderr, "\nOpenScribe cannot silence this output device. Recording still\n")
 		fmt.Fprintf(os.Stderr, "works; disable this feature with:\n")
 		fmt.Fprintf(os.Stderr, "  openscribe config --disable-mute-during-recording\n")
 		os.Exit(1)
 	}
 
-	fmt.Printf("Muted using: %s\n", muter.Method())
+	if muter.Method() == "nothing playing" {
+		fmt.Println("Nothing was playing, so there was nothing to silence.")
+		fmt.Println("Start some audio and run this again to test the pause fallback.")
+	} else {
+		fmt.Printf("Silenced using: %s\n", muter.Method())
+	}
 	time.Sleep(2 * time.Second)
 
 	if err := muter.Restore(); err != nil {

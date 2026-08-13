@@ -7,6 +7,17 @@ package audio
 // Restore always targets the same device even if the user switches outputs
 // mid-recording.
 type OutputMuter interface {
+	// Prepare samples state that playing a sound would disturb. Call it
+	// before any feedback sound, otherwise that sound makes the output device
+	// look busy to the playback detection.
+	Prepare()
+
+	// SupportsVolumeControl reports whether the operating system can change
+	// the output device's level at all. Some outputs — notably monitors that
+	// keep volume in their own hardware — cannot be controlled, and are
+	// silenced by pausing playback instead.
+	SupportsVolumeControl() bool
+
 	// Mute silences the current default output device.
 	// It is a no-op if the device is already muted by this instance.
 	Mute() error

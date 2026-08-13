@@ -250,6 +250,13 @@ func runStart(cmd *cobra.Command) {
 					fmt.Fprintf(os.Stderr, "Warning: Failed to restore system volume: %v\n", err)
 				}
 			}()
+
+			// Say so up front when the output can't be turned down, rather
+			// than failing on every recording
+			if !muter.SupportsVolumeControl() {
+				fmt.Printf("   Note: macOS cannot set the volume of %q.\n", muter.Describe())
+				fmt.Printf("         Playback will be paused while recording instead.\n\n")
+			}
 		}
 	}
 
@@ -314,6 +321,12 @@ func runStart(cmd *cobra.Command) {
 		defer mu.Unlock()
 
 		if !isRecording {
+			// Sample what is playing before the start sound does, so the
+			// feedback sound isn't mistaken for media playback
+			if muter != nil {
+				muter.Prepare()
+			}
+
 			// Start recording
 			isRecording = true
 			recordStart = time.Now()
