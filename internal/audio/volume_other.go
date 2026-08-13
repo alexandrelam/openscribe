@@ -26,6 +26,16 @@ func (m *noopOutputMuter) IsMuted() bool {
 	return false
 }
 
+// Method always reports no mechanism on unsupported platforms
+func (m *noopOutputMuter) Method() string {
+	return ""
+}
+
+// Describe reports that muting is unavailable on unsupported platforms
+func (m *noopOutputMuter) Describe() string {
+	return "output muting is not supported on this platform"
+}
+
 // Close does nothing on unsupported platforms
 func (m *noopOutputMuter) Close() error {
 	return nil
