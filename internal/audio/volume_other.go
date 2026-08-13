@@ -3,6 +3,9 @@
 
 package audio
 
+// Compile-time check that the stub muter satisfies the interface
+var _ OutputMuter = (*noopOutputMuter)(nil)
+
 // noopOutputMuter is a no-op implementation for unsupported platforms
 type noopOutputMuter struct{}
 

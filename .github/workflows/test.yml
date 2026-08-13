@@ -28,3 +28,28 @@ jobs:
 
       - name: Build
         run: make build
+
+  # The Linux job never compiles the darwin-only files (CoreAudio, NSSound,
+  # CGEventTap), so a break there is invisible to it. This job builds them.
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: make build
