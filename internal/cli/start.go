@@ -53,7 +53,11 @@ func runStart(cmd *cobra.Command) {
 		cfg.PreferredMicrophones = append([]string{micOverride}, cfg.PreferredMicrophones...)
 	}
 	if cmd.Flags().Changed("backend") {
-		cfg.Backend, _ = cmd.Flags().GetString("backend")
+		raw, _ := cmd.Flags().GetString("backend")
+		cfg.Backend = config.NormalizeBackend(raw)
+		if cfg.Backend != raw {
+			fmt.Printf("Note: backend %q has been renamed to %q.\n", raw, cfg.Backend)
+		}
 	}
 	if cmd.Flags().Changed("model") {
 		modelOverride, _ := cmd.Flags().GetString("model")
@@ -90,12 +94,12 @@ func runStart(cmd *cobra.Command) {
 		backend = "whisper"
 	}
 
-	if backend == "openai" {
-		// OpenAI backend: no local model needed, just validate API key
-		if cfg.OpenAIAPIKey == "" {
-			fmt.Fprintf(os.Stderr, "Error: OpenAI backend requires an API key.\n\n")
-			fmt.Fprintf(os.Stderr, "Set your API key with:\n")
-			fmt.Fprintf(os.Stderr, "  openscribe config --set-openai-api-key <your-key>\n\n")
+	if backend == "openrouter" {
+		// OpenRouter backend: no local model needed, just validate API key
+		if cfg.OpenRouterAPIKey == "" {
+			fmt.Fprintf(os.Stderr, "Error: OpenRouter backend requires an API key.\n\n")
+			fmt.Fprintf(os.Stderr, "Get a key at https://openrouter.ai/keys, then set it with:\n")
+			fmt.Fprintf(os.Stderr, "  openscribe config --set-openrouter-api-key <your-key>\n\n")
 			os.Exit(1)
 		}
 	} else if backend == "whisper" {
@@ -167,8 +171,8 @@ func runStart(cmd *cobra.Command) {
 			fmt.Fprintf(os.Stderr, "Error: whisper-cpp is not installed.\n\n")
 			fmt.Fprintf(os.Stderr, "Please install whisper.cpp via Homebrew:\n")
 			fmt.Fprintf(os.Stderr, "  brew install whisper-cpp\n\n")
-		case "openai":
-			fmt.Fprintf(os.Stderr, "Error initializing OpenAI backend: %v\n\n", err)
+		case "openrouter":
+			fmt.Fprintf(os.Stderr, "Error initializing OpenRouter backend: %v\n\n", err)
 			fmt.Fprintf(os.Stderr, "Check your API key with:\n")
 			fmt.Fprintf(os.Stderr, "  openscribe config --show\n\n")
 		default:
@@ -201,12 +205,12 @@ func runStart(cmd *cobra.Command) {
 	switch backend {
 	case "moonshine":
 		fmt.Printf("  Model:           %s (moonshine)\n", moonModel)
-	case "openai":
-		om := cfg.OpenAIModel
+	case "openrouter":
+		om := cfg.OpenRouterModel
 		if om == "" {
-			om = "gpt-transcribe"
+			om = config.DefaultOpenRouterModel
 		}
-		fmt.Printf("  Model:           %s (openai)\n", om)
+		fmt.Printf("  Model:           %s (openrouter)\n", om)
 	default:
 		fmt.Printf("  Model:           %s\n", cfg.Model)
 	}
@@ -801,5 +805,5 @@ func init() {
 	startCmd.Flags().StringP("language", "l", "", "Override language setting")
 	startCmd.Flags().Bool("no-paste", false, "Disable auto-paste")
 	startCmd.Flags().BoolP("verbose", "v", false, "Enable verbose debug output")
-	startCmd.Flags().String("backend", "", "Transcription backend (whisper, moonshine, or openai)")
+	startCmd.Flags().String("backend", "", "Transcription backend (whisper, moonshine, or openrouter)")
 }

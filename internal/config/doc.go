@@ -11,7 +11,9 @@
 //
 // The configuration file (config.yaml) stores user preferences including:
 //   - Microphone selection
+//   - Transcription backend selection (whisper, moonshine, openrouter)
 //   - Whisper model preference
+//   - OpenRouter API key and model (cloud backend)
 //   - Language settings
 //   - Hotkey configuration
 //   - Audio feedback settings

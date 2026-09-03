@@ -40,6 +40,8 @@
 - No internet required, no data sent to servers
 - Unlike cloud-based services, your conversations stay private
 
+> The default Whisper backend and the Moonshine backend are fully offline. The optional [OpenRouter backend](#openrouter-cloud-backend) is opt-in and *does* send your audio to a third-party API — only enable it if that trade-off suits you.
+
 ### 🌍 **Works Everywhere**
 - **Universal compatibility** - works in any macOS application
 - One hotkey activation across all your apps
@@ -59,6 +61,7 @@
 - [Quick Start](#-quick-start)
 - [Usage](#-usage)
 - [Configuration](#️-configuration)
+- [Cloud Transcription (OpenRouter)](#openrouter-cloud-backend)
 - [Commands Reference](#-commands-reference)
 - [Troubleshooting](#-troubleshooting)
 - [How It Works](#-how-it-works)
@@ -363,6 +366,73 @@ openscribe models list --backend moonshine
 openscribe models download --backend moonshine small-streaming
 ```
 
+### OpenRouter (Cloud) Backend
+<a id="openrouter-cloud-backend"></a>
+
+OpenScribe can transcribe through [OpenRouter](https://openrouter.ai), which gives access to
+a large catalogue of speech-to-text models behind a single API key. This is the only
+backend that sends your audio off-device — see the privacy note above.
+
+The default model is `microsoft/mai-transcribe-2`.
+
+#### Setting Up OpenRouter
+
+1. **Get an API key** at [openrouter.ai/keys](https://openrouter.ai/keys). OpenRouter keys
+   start with `sk-or-`. An OpenAI key will not work.
+
+2. **Set your API key:**
+   ```bash
+   openscribe config --set-openrouter-api-key sk-or-v1-...
+   ```
+
+3. **Switch to the OpenRouter backend:**
+   ```bash
+   openscribe config --open
+   ```
+   Then set the following in your `config.yaml`:
+   ```yaml
+   backend: openrouter
+   openrouter_model: microsoft/mai-transcribe-2  # optional; this is the default
+   ```
+
+   Or run a single session with it:
+   ```bash
+   openscribe start --backend openrouter
+   ```
+
+4. **Start OpenScribe as usual:**
+   ```bash
+   openscribe start
+   ```
+
+#### Choosing a Model
+
+Any speech-to-text model in OpenRouter's catalogue works. Model slugs are always in
+`provider/model` form:
+
+```bash
+# Use the default (microsoft/mai-transcribe-2)
+openscribe config --set-openrouter-model ""
+
+# Or pick another model
+openscribe config --set-openrouter-model openai/whisper-large-v3
+```
+
+Browse the available models at
+[openrouter.ai/models](https://openrouter.ai/models?output_modalities=transcription).
+
+#### Upgrading from the old OpenAI backend
+
+Earlier versions had an `openai` backend. Your config is migrated automatically the next
+time OpenScribe loads it: `backend: openai` becomes `backend: openrouter`, and
+`openai_api_key` moves to `openrouter_api_key`.
+
+Two things need your attention after upgrading:
+
+- **Your API key must be replaced.** OpenRouter does not accept OpenAI keys.
+- **`openai_prompt` and `openai_keywords` are gone.** OpenRouter's transcription endpoint
+  has no equivalent parameters, so these settings are removed from your config.
+
 ### Configure Language
 
 ```bash
@@ -494,6 +564,7 @@ complete_sound: "Glass"
 | `-l, --language` | Override language setting |
 | `--no-paste` | Disable auto-paste feature |
 | `-v, --verbose` | Enable verbose debug output |
+| `--backend` | Transcription backend (`whisper`, `moonshine`, or `openrouter`) |
 
 ### Config Command Flags
 
@@ -510,6 +581,8 @@ complete_sound: "Glass"
 | `--set-model` | Set default model |
 | `--set-language` | Set default language |
 | `--set-hotkey` | Configure activation hotkey |
+| `--set-openrouter-api-key` | Set OpenRouter API key for cloud transcription |
+| `--set-openrouter-model` | Set OpenRouter model slug (default: `microsoft/mai-transcribe-2`) |
 | `--list-hotkeys` | List available hotkeys |
 | `--enable-audio-feedback` | Enable audio feedback |
 | `--disable-audio-feedback` | Disable audio feedback |

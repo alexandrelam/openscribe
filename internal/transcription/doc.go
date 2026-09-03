@@ -1,18 +1,19 @@
-// Package transcription provides speech-to-text transcription using Whisper.
+// Package transcription provides speech-to-text transcription backends.
 //
-// This package handles:
-//   - Integration with whisper-cpp (via command-line invocation)
-//   - Model loading and validation
-//   - Audio file transcription with various options
-//   - Language detection and specification
-//   - Error handling for transcription failures
+// Three backends sit behind the Transcriber interface, selected by the
+// "backend" config key:
+//
+//   - whisper (default): local transcription via whisper-cpp, invoked as a
+//     subprocess. Requires a downloaded model. Fully offline.
+//   - moonshine: local transcription via the Moonshine models. Requires
+//     building with -tags moonshine. Fully offline.
+//   - openrouter: cloud transcription via the OpenRouter API. Requires an API
+//     key. This is the only backend that sends audio off-device.
 //
 // The transcription process:
 //  1. Takes an audio file path (WAV format, 16kHz, mono)
-//  2. Validates the specified Whisper model exists
-//  3. Invokes whisper-cli with appropriate parameters
-//  4. Parses the transcription output
-//  5. Returns the transcribed text
+//  2. Dispatches to the configured backend
+//  3. Returns the transcribed text plus any detected language and duration
 //
 // Supported Whisper models:
 //   - tiny: Fastest, least accurate (~75MB)
@@ -23,18 +24,21 @@
 //
 // Example usage:
 //
-//	// Create transcriber
-//	transcriber := transcription.NewTranscriber()
-//
-//	// Transcribe audio file
-//	opts := transcription.Options{
-//	    Model:    "small",
-//	    Language: "en",
-//	    Verbose:  false,
-//	}
-//	text, err := transcriber.Transcribe("audio.wav", opts)
+//	// Create a transcriber for the configured backend
+//	transcriber, err := transcription.New(cfg)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	fmt.Println(text)
+//
+//	// Transcribe an audio file
+//	opts := transcription.Options{
+//	    Model:    models.Small,
+//	    Language: "en", // empty means auto-detect
+//	    Verbose:  false,
+//	}
+//	result, err := transcriber.TranscribeFile("audio.wav", opts)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(result.Text)
 package transcription
