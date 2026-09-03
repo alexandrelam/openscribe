@@ -895,3 +895,244 @@ func TestSave_PreservesDisabledMuteDuringRecording(t *testing.T) {
 		t.Error("MuteDuringRecordingEnabled() = true after saving an explicit false, want false")
 	}
 }
+
+// writeLegacyConfig writes yamlContent to the config path under a temp HOME,
+// prefixed with the baseline fields Validate() requires so each fixture can
+// focus on the OpenRouter migration itself.
+func writeLegacyConfig(t *testing.T, yamlContent string) string {
+	t.Helper()
+	yamlContent = "triggers:\n    - Right Option\n" + yamlContent
+	if err := EnsureDirectories(); err != nil {
+		t.Fatalf("EnsureDirectories() error = %v", err)
+	}
+	configPath, err := GetConfigPath()
+	if err != nil {
+		t.Fatalf("GetConfigPath() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+	return configPath
+}
+
+func TestMigrate_OpenAIBackendToOpenRouter(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	configPath := writeLegacyConfig(t, `backend: "openai"
+model: "small"
+openai_api_key: "sk-or-v1-testkey1234"
+`)
+
+	// Load must succeed: migrate() runs before Validate(), so the retired
+	// "openai" backend value never reaches the whitelist.
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if loaded.Backend != "openrouter" {
+		t.Errorf("Backend = %q, want openrouter", loaded.Backend)
+	}
+	if loaded.OpenRouterAPIKey != "sk-or-v1-testkey1234" {
+		t.Errorf("OpenRouterAPIKey = %q, want the migrated key", loaded.OpenRouterAPIKey)
+	}
+	if loaded.OpenAIAPIKey != "" {
+		t.Errorf("OpenAIAPIKey = %q, want it cleared", loaded.OpenAIAPIKey)
+	}
+
+	// The rewritten file must carry only the new keys.
+	saved, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to re-read config: %v", err)
+	}
+	got := string(saved)
+	if !strings.Contains(got, "openrouter_api_key") {
+		t.Errorf("saved config missing openrouter_api_key:\n%s", got)
+	}
+	if strings.Contains(got, "openai_api_key") {
+		t.Errorf("saved config still contains openai_api_key:\n%s", got)
+	}
+	if strings.Contains(got, "backend: openai\n") {
+		t.Errorf("saved config still contains the openai backend:\n%s", got)
+	}
+}
+
+func TestMigrate_OpenAIModelHandling(t *testing.T) {
+	tests := []struct {
+		name       string
+		legacy     string
+		wantModel  string
+		wantSaveOK bool
+	}{
+		{
+			name:      "OpenAI-only model is discarded in favour of the default",
+			legacy:    "gpt-transcribe",
+			wantModel: "",
+		},
+		{
+			name:      "Provider/model slug is carried over",
+			legacy:    "openai/whisper-large-v3",
+			wantModel: "openai/whisper-large-v3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			writeLegacyConfig(t, `backend: "openai"
+openai_api_key: "sk-or-v1-testkey1234"
+openai_model: "`+tt.legacy+`"
+`)
+
+			loaded, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if loaded.OpenRouterModel != tt.wantModel {
+				t.Errorf("OpenRouterModel = %q, want %q", loaded.OpenRouterModel, tt.wantModel)
+			}
+			if loaded.OpenAIModel != "" {
+				t.Errorf("OpenAIModel = %q, want it cleared", loaded.OpenAIModel)
+			}
+		})
+	}
+}
+
+func TestMigrate_DropsPromptAndKeywords(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	configPath := writeLegacyConfig(t, `backend: "openai"
+openai_api_key: "sk-or-v1-testkey1234"
+openai_prompt: "a meeting about quarterly revenue"
+openai_keywords:
+    - Kubernetes
+    - Postgres
+`)
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if loaded.OpenAIPrompt != "" {
+		t.Errorf("OpenAIPrompt = %q, want it cleared", loaded.OpenAIPrompt)
+	}
+	if len(loaded.OpenAIKeywords) != 0 {
+		t.Errorf("OpenAIKeywords = %v, want it cleared", loaded.OpenAIKeywords)
+	}
+
+	saved, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to re-read config: %v", err)
+	}
+	if strings.Contains(string(saved), "openai_prompt") || strings.Contains(string(saved), "openai_keywords") {
+		t.Errorf("saved config still contains dropped keys:\n%s", saved)
+	}
+}
+
+// TestMigrate_IsIdempotent guards against migrate() rewriting the config on
+// every single load, which would re-log the migration notices forever.
+func TestMigrate_IsIdempotent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	configPath := writeLegacyConfig(t, `backend: "openai"
+openai_api_key: "sk-or-v1-testkey1234"
+openai_model: "gpt-transcribe"
+openai_prompt: "some context"
+`)
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("first Load() error = %v", err)
+	}
+	afterFirst, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("second Load() error = %v", err)
+	}
+	afterSecond, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+
+	if string(afterFirst) != string(afterSecond) {
+		t.Errorf("migrate() is not idempotent.\nfirst:\n%s\nsecond:\n%s", afterFirst, afterSecond)
+	}
+}
+
+func TestValidate_Backend(t *testing.T) {
+	tests := []struct {
+		name    string
+		backend string
+		key     string
+		wantErr bool
+	}{
+		{name: "Empty backend is valid", backend: "", wantErr: false},
+		{name: "whisper is valid", backend: "whisper", wantErr: false},
+		{name: "moonshine is valid", backend: "moonshine", wantErr: false},
+		{name: "openrouter with a key is valid", backend: "openrouter", key: "sk-or-v1-x", wantErr: false},
+		// A missing key must NOT invalidate the config: Load() would then fail
+		// and lock the user out of the command that sets the key.
+		{name: "openrouter without a key is still a valid config", backend: "openrouter", wantErr: false},
+		// "openai" is migration-only: migrate() rewrites it before Validate()
+		// ever sees it, so reaching Validate() with it is a real error.
+		{name: "openai is no longer a valid backend", backend: "openai", key: "sk-x", wantErr: true},
+		{name: "Unknown backend is rejected", backend: "banana", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Backend = tt.backend
+			cfg.OpenRouterAPIKey = tt.key
+
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestMaskSecret(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "Empty", input: "", want: "(not set)"},
+		{name: "Very short key is not sliced", input: "abc", want: "****"},
+		{name: "Eleven chars is still masked whole", input: "sk-or-v1-ab", want: "****"},
+		{name: "Realistic key is partially shown", input: "sk-or-v1-abcdefgh1234", want: "sk-or-v..." + "1234"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := maskSecret(tt.input); got != tt.want {
+				t.Errorf("maskSecret(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeBackend(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "openai", want: "openrouter"},
+		{input: "openrouter", want: "openrouter"},
+		{input: "whisper", want: "whisper"},
+		{input: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := NormalizeBackend(tt.input); got != tt.want {
+				t.Errorf("NormalizeBackend(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

@@ -10,6 +10,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DefaultOpenRouterModel is the default OpenRouter transcription model used when
+// no model is configured. It lives here rather than in the transcription package
+// because transcription imports config; the reverse would be an import cycle.
+const DefaultOpenRouterModel = "microsoft/mai-transcribe-2"
+
+// NormalizeBackend maps deprecated backend names onto their current equivalents.
+// The cloud backend was renamed from "openai" to "openrouter"; config files are
+// rewritten by migrate(), but a --backend flag can still carry the old value.
+func NormalizeBackend(backend string) string {
+	if backend == "openai" {
+		return "openrouter"
+	}
+	return backend
+}
+
+// maskSecret renders an API key for display without revealing it. Short values
+// are masked entirely rather than sliced, which would panic.
+func maskSecret(s string) string {
+	if s == "" {
+		return "(not set)"
+	}
+	if len(s) < 12 {
+		return "****"
+	}
+	return s[:7] + "..." + s[len(s)-4:]
+}
+
 // Config represents the application configuration
 type Config struct {
 	// Microphone is the selected audio input device (LEGACY - for backward compatibility)
@@ -49,22 +76,33 @@ type Config struct {
 	// Use MuteDuringRecordingEnabled() to read it.
 	MuteDuringRecording *bool `yaml:"mute_during_recording,omitempty"`
 
-	// Backend selects the transcription engine ("whisper", "moonshine", or "openai")
+	// Backend selects the transcription engine ("whisper", "moonshine", or "openrouter")
 	Backend string `yaml:"backend"`
 
 	// MoonshineModel is the Moonshine model to use (tiny, base)
 	MoonshineModel string `yaml:"moonshine_model,omitempty"`
 
-	// OpenAIAPIKey is the API key for OpenAI cloud transcription
+	// OpenRouterAPIKey is the API key for OpenRouter cloud transcription
+	OpenRouterAPIKey string `yaml:"openrouter_api_key,omitempty"`
+
+	// OpenRouterModel is the OpenRouter model slug to use for transcription
+	// (e.g., "microsoft/mai-transcribe-2"). Empty means DefaultOpenRouterModel.
+	OpenRouterModel string `yaml:"openrouter_model,omitempty"`
+
+	// Deprecated: use OpenRouterAPIKey. Retained so pre-OpenRouter configs still
+	// unmarshal and can be migrated. Never read outside migrate().
 	OpenAIAPIKey string `yaml:"openai_api_key,omitempty"`
 
-	// OpenAIModel is the OpenAI model to use for transcription (e.g., "gpt-transcribe", "whisper-1")
+	// Deprecated: use OpenRouterModel. Retained so pre-OpenRouter configs still
+	// unmarshal and can be migrated. Never read outside migrate().
 	OpenAIModel string `yaml:"openai_model,omitempty"`
 
-	// OpenAIPrompt is free-form context describing the recording's topic or setting
+	// Deprecated: no longer used. OpenRouter's transcription endpoint has no
+	// prompt parameter. Retained only so old configs migrate cleanly.
 	OpenAIPrompt string `yaml:"openai_prompt,omitempty"`
 
-	// OpenAIKeywords are literal terms expected in the audio, passed as hints to newer models
+	// Deprecated: no longer used. OpenRouter's transcription endpoint has no
+	// keywords parameter. Retained only so old configs migrate cleanly.
 	OpenAIKeywords []string `yaml:"openai_keywords,omitempty"`
 
 	// Verbose enables detailed debug output
@@ -203,6 +241,53 @@ func (c *Config) migrate() {
 		needsSave = true
 	}
 
+	// Auto-migrate: cloud backend renamed "openai" -> "openrouter".
+	// This runs before Validate(), so an old config survives the backend whitelist.
+	if c.Backend == "openai" {
+		c.Backend = "openrouter"
+		log.Printf("[CONFIG] Migrated backend 'openai' to 'openrouter'")
+		needsSave = true
+	}
+
+	// Auto-migrate: openai_api_key -> openrouter_api_key.
+	// The key is carried over rather than cleared: clearing it would make
+	// Validate() reject the config and lock the user out of every command,
+	// including the one they need to set a new key.
+	if c.OpenAIAPIKey != "" {
+		if c.OpenRouterAPIKey == "" {
+			c.OpenRouterAPIKey = c.OpenAIAPIKey
+			log.Printf("[CONFIG] Migrated legacy 'openai_api_key' field to 'openrouter_api_key'")
+			if strings.HasPrefix(c.OpenAIAPIKey, "sk-") && !strings.HasPrefix(c.OpenAIAPIKey, "sk-or-") {
+				log.Printf("[CONFIG] Warning: that key looks like an OpenAI key. OpenRouter keys start with 'sk-or-'. Get one at https://openrouter.ai/keys and set it with: openscribe config --set-openrouter-api-key <key>")
+			}
+		}
+		c.OpenAIAPIKey = ""
+		needsSave = true
+	}
+
+	// Auto-migrate: openai_model -> openrouter_model. OpenAI model IDs are not
+	// valid OpenRouter slugs, so only a provider/model slug is carried over.
+	if c.OpenAIModel != "" {
+		if c.OpenRouterModel == "" {
+			if strings.Contains(c.OpenAIModel, "/") {
+				c.OpenRouterModel = c.OpenAIModel
+				log.Printf("[CONFIG] Migrated legacy 'openai_model' field to 'openrouter_model': %s", c.OpenRouterModel)
+			} else {
+				log.Printf("[CONFIG] Note: 'openai_model' (%s) is not an OpenRouter model slug and was reset to the default (%s)", c.OpenAIModel, DefaultOpenRouterModel)
+			}
+		}
+		c.OpenAIModel = ""
+		needsSave = true
+	}
+
+	// Removed: OpenRouter's transcription endpoint has no prompt or keywords parameter.
+	if c.OpenAIPrompt != "" || len(c.OpenAIKeywords) > 0 {
+		c.OpenAIPrompt = ""
+		c.OpenAIKeywords = nil
+		log.Printf("[CONFIG] Note: 'openai_prompt' and 'openai_keywords' are no longer supported (the OpenRouter transcription API has no equivalent) and have been removed from your config")
+		needsSave = true
+	}
+
 	// Save migrated config if any migrations occurred
 	if needsSave {
 		if err := c.Save(); err != nil {
@@ -255,19 +340,20 @@ func (c *Config) Validate() error {
 
 	// Validate backend
 	validBackends := map[string]bool{
-		"":          true,
-		"whisper":   true,
-		"moonshine": true,
-		"openai":    true,
+		"":           true,
+		"whisper":    true,
+		"moonshine":  true,
+		"openrouter": true,
 	}
 	if !validBackends[c.Backend] {
-		return fmt.Errorf("invalid backend: %s (must be one of: whisper, moonshine, openai)", c.Backend)
+		return fmt.Errorf("invalid backend: %s (must be one of: whisper, moonshine, openrouter)", c.Backend)
 	}
 
-	// Validate OpenAI backend requirements
-	if c.Backend == "openai" && c.OpenAIAPIKey == "" {
-		return fmt.Errorf("openai backend requires openai_api_key to be set. Use: openscribe config --set-openai-api-key <key>")
-	}
+	// A missing OpenRouter API key is deliberately NOT a validation error. Load()
+	// fails the whole config on a Validate() error, which would lock the user out
+	// of every command -- including the "config --set-openrouter-api-key" needed
+	// to recover. The missing key is caught instead where it matters: the start
+	// command's precheck and NewOpenRouterTranscriber.
 
 	// Validate model (only enforce whisper model names when backend is whisper)
 	if c.Backend == "" || c.Backend == "whisper" {
@@ -424,24 +510,14 @@ func (c *Config) String() string {
 		moonshineDisplay = fmt.Sprintf("\n  Moonshine Model: %s", mm)
 	}
 
-	// Show OpenAI settings if relevant
-	var openaiDisplay string
-	if c.Backend == "openai" {
-		om := c.OpenAIModel
+	// Show OpenRouter settings if relevant
+	var openrouterDisplay string
+	if c.Backend == "openrouter" {
+		om := c.OpenRouterModel
 		if om == "" {
-			om = "gpt-transcribe"
+			om = DefaultOpenRouterModel
 		}
-		keyDisplay := "(not set)"
-		if c.OpenAIAPIKey != "" {
-			keyDisplay = c.OpenAIAPIKey[:7] + "..." + c.OpenAIAPIKey[len(c.OpenAIAPIKey)-4:]
-		}
-		openaiDisplay = fmt.Sprintf("\n  OpenAI Model:    %s\n  OpenAI API Key:  %s", om, keyDisplay)
-		if c.OpenAIPrompt != "" {
-			openaiDisplay += fmt.Sprintf("\n  OpenAI Prompt:   %s", c.OpenAIPrompt)
-		}
-		if len(c.OpenAIKeywords) > 0 {
-			openaiDisplay += fmt.Sprintf("\n  OpenAI Keywords: %s", strings.Join(c.OpenAIKeywords, ", "))
-		}
+		openrouterDisplay = fmt.Sprintf("\n  Cloud Model:     %s\n  Cloud API Key:   %s", om, maskSecret(c.OpenRouterAPIKey))
 	}
 
 	return fmt.Sprintf(`Current Configuration:
@@ -472,7 +548,7 @@ Paths:
 `,
 		backend,
 		moonshineDisplay,
-		openaiDisplay,
+		openrouterDisplay,
 		microphone,
 		preferredMics,
 		c.Model,

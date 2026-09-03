@@ -30,8 +30,8 @@ var configCmd = &cobra.Command{
 			!cmd.Flags().Changed("set-model") &&
 			!cmd.Flags().Changed("set-language") &&
 			!cmd.Flags().Changed("set-hotkey") &&
-			!cmd.Flags().Changed("set-openai-api-key") &&
-			!cmd.Flags().Changed("set-openai-model") &&
+			!cmd.Flags().Changed("set-openrouter-api-key") &&
+			!cmd.Flags().Changed("set-openrouter-model") &&
 			!cmd.Flags().Changed("enable-audio-feedback") &&
 			!cmd.Flags().Changed("disable-audio-feedback") &&
 			!cmd.Flags().Changed("test-mute") &&
@@ -134,27 +134,15 @@ var configCmd = &cobra.Command{
 			return
 		}
 
-		if cmd.Flags().Changed("set-openai-api-key") {
-			value, _ := cmd.Flags().GetString("set-openai-api-key")
-			handleSetOpenAIAPIKey(value)
+		if cmd.Flags().Changed("set-openrouter-api-key") {
+			value, _ := cmd.Flags().GetString("set-openrouter-api-key")
+			handleSetOpenRouterAPIKey(value)
 			return
 		}
 
-		if cmd.Flags().Changed("set-openai-model") {
-			value, _ := cmd.Flags().GetString("set-openai-model")
-			handleSetOpenAIModel(value)
-			return
-		}
-
-		if cmd.Flags().Changed("set-openai-prompt") {
-			value, _ := cmd.Flags().GetString("set-openai-prompt")
-			handleSetOpenAIPrompt(value)
-			return
-		}
-
-		if cmd.Flags().Changed("set-openai-keywords") {
-			value, _ := cmd.Flags().GetString("set-openai-keywords")
-			handleSetOpenAIKeywords(value)
+		if cmd.Flags().Changed("set-openrouter-model") {
+			value, _ := cmd.Flags().GetString("set-openrouter-model")
+			handleSetOpenRouterModel(value)
 			return
 		}
 
@@ -639,101 +627,64 @@ func handleClearPreferences() {
 	fmt.Println("Configuration saved successfully!")
 }
 
-func handleSetOpenAIAPIKey(key string) {
+func handleSetOpenRouterAPIKey(key string) {
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	cfg.OpenAIAPIKey = key
+	cfg.OpenRouterAPIKey = strings.TrimSpace(key)
 
 	if err := cfg.Save(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	if key == "" {
-		fmt.Println("OpenAI API key cleared.")
+	if cfg.OpenRouterAPIKey == "" {
+		fmt.Println("OpenRouter API key cleared.")
 	} else {
-		fmt.Printf("OpenAI API key set: %s...%s\n", key[:7], key[len(key)-4:])
-	}
-	fmt.Println("Configuration saved successfully!")
-	fmt.Println("\nTo use OpenAI transcription, set the backend:")
-	fmt.Println("  openscribe config --set-model openai")
-	fmt.Println("  (or use: openscribe start --backend openai)")
-}
-
-func handleSetOpenAIModel(model string) {
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	cfg.OpenAIModel = model
-
-	if err := cfg.Save(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	if model == "" {
-		fmt.Println("OpenAI model reset to default (gpt-transcribe).")
-	} else {
-		fmt.Printf("OpenAI model set to: %s\n", model)
-	}
-	fmt.Println("Configuration saved successfully!")
-}
-
-func handleSetOpenAIPrompt(prompt string) {
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	cfg.OpenAIPrompt = prompt
-
-	if err := cfg.Save(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	if prompt == "" {
-		fmt.Println("OpenAI prompt cleared.")
-	} else {
-		fmt.Printf("OpenAI prompt set to: %s\n", prompt)
-	}
-	fmt.Println("Configuration saved successfully!")
-}
-
-func handleSetOpenAIKeywords(value string) {
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	var keywords []string
-	for _, kw := range strings.Split(value, ",") {
-		if trimmed := strings.TrimSpace(kw); trimmed != "" {
-			keywords = append(keywords, trimmed)
+		fmt.Printf("OpenRouter API key set: %s\n", maskKey(cfg.OpenRouterAPIKey))
+		if !strings.HasPrefix(cfg.OpenRouterAPIKey, "sk-or-") {
+			fmt.Println("\nWarning: OpenRouter keys normally start with 'sk-or-'.")
+			fmt.Println("If transcription fails with HTTP 401, get a key at https://openrouter.ai/keys")
 		}
 	}
-	cfg.OpenAIKeywords = keywords
+	fmt.Println("Configuration saved successfully!")
+	fmt.Println("\nTo use OpenRouter transcription, set the backend in your config file:")
+	fmt.Println("  openscribe config --open      # then set: backend: openrouter")
+	fmt.Println("  (or run once with: openscribe start --backend openrouter)")
+}
+
+func handleSetOpenRouterModel(model string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg.OpenRouterModel = strings.TrimSpace(model)
 
 	if err := cfg.Save(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(keywords) == 0 {
-		fmt.Println("OpenAI keywords cleared.")
+	if cfg.OpenRouterModel == "" {
+		fmt.Printf("OpenRouter model reset to default (%s).\n", config.DefaultOpenRouterModel)
 	} else {
-		fmt.Printf("OpenAI keywords set to: %s\n", strings.Join(keywords, ", "))
+		fmt.Printf("OpenRouter model set to: %s\n", cfg.OpenRouterModel)
 	}
 	fmt.Println("Configuration saved successfully!")
+}
+
+// maskKey renders an API key for terminal echo without revealing it. Short
+// values are masked entirely rather than sliced, which would panic.
+func maskKey(key string) string {
+	if len(key) < 12 {
+		return "****"
+	}
+	return key[:7] + "..." + key[len(key)-4:]
 }
 
 func init() {
@@ -755,10 +706,8 @@ func init() {
 	configCmd.Flags().String("set-model", "", "Set default model")
 	configCmd.Flags().String("set-language", "", "Set default language")
 	configCmd.Flags().String("set-hotkey", "", "Configure activation hotkey")
-	configCmd.Flags().String("set-openai-api-key", "", "Set OpenAI API key for cloud transcription")
-	configCmd.Flags().String("set-openai-model", "", "Set OpenAI model (e.g., gpt-transcribe, whisper-1)")
-	configCmd.Flags().String("set-openai-prompt", "", "Set OpenAI prompt describing the recording's topic/context")
-	configCmd.Flags().String("set-openai-keywords", "", "Set OpenAI keyword hints (comma-separated literal terms)")
+	configCmd.Flags().String("set-openrouter-api-key", "", "Set OpenRouter API key for cloud transcription")
+	configCmd.Flags().String("set-openrouter-model", "", "Set OpenRouter model slug (default: "+config.DefaultOpenRouterModel+")")
 
 	// Add flags for preference management
 	configCmd.Flags().Bool("show-preferences", false, "Show current preferred microphones list")
